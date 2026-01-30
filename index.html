@@ -2,154 +2,150 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <title>SpendTracker Pro</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #000000; color: #ffffff; }
-        .bento-card { background-color: #1c1c1e; border-radius: 24px; transition: transform 0.2s; }
-        .accent-green { background-color: #d4ff70; color: #000000; } /* Inspired by your image's growth card */
-        .accent-purple { background-color: #a29bfe; color: #000000; }
-        .accent-orange { background-color: #ff7675; color: #ffffff; }
+        body { background-color: #000000; color: #ffffff; -webkit-tap-highlight-color: transparent; }
+        .category-chip { transition: all 0.2s; border: 1px solid #27272a; }
+        .category-chip.selected { background-color: #d4ff70; color: black; border-color: #d4ff70; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .confirm-btn { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
-<body class="p-4 pb-12 font-sans">
+<body class="p-6 font-sans">
     <div class="max-w-md mx-auto">
         
-        <div class="flex justify-between items-center mb-6 px-2">
-            <h1 class="text-xl font-bold tracking-tight text-gray-400 uppercase text-xs">Your Spending</h1>
-            <div class="bg-zinc-800 px-3 py-1 rounded-full text-[10px] font-bold">HUF (Ft)</div>
+        <div class="flex flex-col mb-10 px-1">
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Total Spent</span>
+            <h2 id="totalDisplay" class="text-3xl font-bold tabular-nums">0 Ft</h2>
         </div>
 
-        <div class="bento-card accent-green p-8 mb-4 shadow-2xl">
-            <p class="text-xs font-black uppercase tracking-widest opacity-70 mb-1">Total This Month</p>
-            <h2 id="totalDisplay" class="text-5xl font-black tabular-nums tracking-tighter">0 Ft</h2>
-        </div>
-
-        <div class="bento-card p-6 mb-4">
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Category</label>
-            <select id="categorySelect" class="w-full mb-4 p-4 bg-zinc-900 border-none rounded-2xl text-white font-bold outline-none ring-1 ring-zinc-800 focus:ring-2 focus:ring-lime-300"></select>
-
-            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Amount</label>
-            <input id="amount" type="number" inputmode="decimal" placeholder="0" class="w-full mb-6 p-4 bg-zinc-900 border-none rounded-2xl text-white text-2xl font-black outline-none ring-1 ring-zinc-800 focus:ring-2 focus:ring-lime-300">
+        <div class="mb-8">
+            <div class="flex justify-between items-end mb-4">
+                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Amount & Category</span>
+                <button onclick="addNewCategory()" class="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-xl font-light text-zinc-500 active:bg-zinc-700">+</button>
+            </div>
             
-            <button onclick="addExpense()" class="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest active:scale-95 transition-all">
-                Add Transaction
-            </button>
+            <input id="amount" type="number" inputmode="decimal" placeholder="0" 
+                class="w-full bg-transparent border-b border-zinc-800 py-4 text-4xl font-medium outline-none focus:border-zinc-500 transition-colors mb-6 text-white placeholder-zinc-800">
+
+            <div id="categoryGrid" class="grid grid-cols-3 gap-2 opacity-30 transition-opacity duration-300"></div>
+
+            <div id="actionArea" class="h-16 mt-6"></div>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 mb-4">
-            <div class="bento-card p-6 bg-zinc-900">
-                <details class="group">
-                    <summary class="list-none cursor-pointer flex justify-between items-center">
-                        <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">⚙️ Customize Categories</span>
-                        <span class="text-gray-500 group-open:rotate-180 transition-transform">↓</span>
-                    </summary>
-                    <div class="mt-4 flex gap-2">
-                        <input id="newCatInput" type="text" placeholder="Rent..." class="flex-1 p-3 bg-black border-none rounded-xl text-sm text-white ring-1 ring-zinc-700">
-                        <button onclick="addNewCategory()" class="bg-white text-black px-4 py-2 rounded-xl text-xs font-black uppercase">Add</button>
-                    </div>
-                    <div id="catList" class="mt-4 flex flex-wrap gap-2"></div>
-                </details>
-            </div>
-        </div>
-
-        <div class="bento-card p-6">
+        <div class="mt-12">
             <div class="flex justify-between items-center mb-6">
-                <h3 class="font-black text-xs uppercase tracking-widest text-gray-500">Activity History</h3>
-                <button onclick="clearAll()" class="text-[10px] text-zinc-600 font-bold uppercase hover:text-red-500">Reset</button>
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-500">History</h3>
+                <button onclick="exportToCSV()" class="text-[10px] font-bold text-zinc-500 border border-zinc-900 px-3 py-1 rounded-full uppercase">Export</button>
             </div>
-            <ul id="expenseList" class="space-y-4 mb-8"></ul>
-            <button onclick="exportToCSV()" class="w-full bg-zinc-800 text-gray-300 p-4 rounded-2xl font-bold text-xs uppercase tracking-widest border border-zinc-700 active:bg-zinc-700">
-                Export to CSV
-            </button>
+            <ul id="expenseList" class="space-y-6"></ul>
+            <button onclick="clearAll()" class="w-full mt-20 py-4 text-[9px] font-black uppercase tracking-[0.3em] text-zinc-800">Clear Storage</button>
         </div>
     </div>
 
     <script>
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
-        let categories = JSON.parse(localStorage.getItem('categories')) || ['Food', 'Tech', 'Travel'];
+        let categories = JSON.parse(localStorage.getItem('categories')) || ['Food', 'Tech', 'Travel', 'Rent', 'Health'];
+        let selectedCategory = null;
+
+        const amountInput = document.getElementById('amount');
+        const categoryGrid = document.getElementById('categoryGrid');
+        const actionArea = document.getElementById('actionArea');
+
+        amountInput.addEventListener('input', () => {
+            categoryGrid.style.opacity = amountInput.value > 0 ? "1" : "0.3";
+            updateActionArea();
+        });
 
         function render() {
-            // Render Categories Dropdown
-            const select = document.getElementById('categorySelect');
-            select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
-
-            // Render Management Chips
-            const catList = document.getElementById('catList');
-            catList.innerHTML = categories.map((c, i) => `
-                <span class="bg-zinc-800 px-3 py-1.5 rounded-full text-[10px] font-black uppercase flex items-center gap-2 border border-zinc-700">
-                    ${c} <button onclick="deleteCategory(${i})" class="text-red-500">×</button>
-                </span>
+            // Render Categories
+            categoryGrid.innerHTML = categories.map(c => `
+                <button onclick="stageCategory('${c}')" id="cat-${c}" 
+                    class="category-chip py-3 rounded-xl text-[10px] font-bold uppercase tracking-tight bg-zinc-900/40 text-zinc-400 ${selectedCategory === c ? 'selected' : ''}">
+                    ${c}
+                </button>
             `).join('');
 
-            // Render Expense List
+            // Render History
             const list = document.getElementById('expenseList');
-            const totalDisplay = document.getElementById('totalDisplay');
-            
             list.innerHTML = expenses.map((e, i) => `
                 <li class="flex justify-between items-center">
                     <div class="flex flex-col">
-                        <span class="text-sm font-bold text-white">${e.item}</span>
-                        <span class="text-[9px] text-zinc-500 uppercase font-black tracking-tighter">${e.date}</span>
+                        <span class="text-sm font-semibold text-zinc-300">${e.category}</span>
+                        <span class="text-[9px] text-zinc-600 font-bold uppercase tracking-tighter">${e.date}</span>
                     </div>
-                    <span class="font-black text-sm">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
+                    <div class="flex items-center gap-4">
+                        <span class="font-bold text-sm text-zinc-400">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
+                        <button onclick="deleteEntry(${i})" class="text-zinc-800 hover:text-red-500 text-xl px-1">×</button>
+                    </div>
                 </li>
             `).reverse().join('');
 
             const total = expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
-            totalDisplay.innerText = `${total.toLocaleString('hu-HU')} Ft`;
+            document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
 
             localStorage.setItem('expenses', JSON.stringify(expenses));
             localStorage.setItem('categories', JSON.stringify(categories));
         }
 
-        function addNewCategory() {
-            const input = document.getElementById('newCatInput');
-            const val = input.value.trim();
-            if(val && !categories.includes(val)) {
-                categories.push(val);
-                input.value = '';
-                render();
+        function stageCategory(cat) {
+            if(!amountInput.value) return amountInput.focus();
+            selectedCategory = cat;
+            render();
+            updateActionArea();
+        }
+
+        function updateActionArea() {
+            if(amountInput.value > 0 && selectedCategory) {
+                actionArea.innerHTML = `
+                    <button onclick="confirmTransaction()" class="confirm-btn w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest text-xs">
+                        Confirm Transaction
+                    </button>
+                `;
+            } else {
+                actionArea.innerHTML = '';
             }
         }
 
-        function deleteCategory(index) {
-            categories.splice(index, 1);
-            render();
-        }
-
-        function addExpense() {
-            const item = document.getElementById('categorySelect').value;
-            const amount = document.getElementById('amount').value;
-            if(!amount || amount <= 0) return;
-
+        function confirmTransaction() {
             expenses.push({ 
-                item, 
-                amount: parseFloat(amount), 
-                date: new Date().toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' }) 
+                category: selectedCategory, 
+                amount: parseFloat(amountInput.value), 
+                date: new Date().toLocaleDateString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) 
             });
             
-            document.getElementById('amount').value = '';
+            amountInput.value = '';
+            selectedCategory = null;
+            render();
+            updateActionArea();
+        }
+
+        function deleteEntry(index) {
+            expenses.splice(index, 1);
             render();
         }
 
-        function clearAll() {
-            if(confirm("Delete all history?")) {
-                expenses = [];
+        function addNewCategory() {
+            const name = prompt("New Category:");
+            if(name && !categories.includes(name)) {
+                categories.push(name);
                 render();
             }
         }
 
+        function clearAll() { if(confirm("Delete all?")) { expenses = []; render(); } }
+
         function exportToCSV() {
-            if (expenses.length === 0) return;
-            let csv = "Date,Category,Amount_HUF\n" + expenses.map(e => `${e.date},${e.item},${e.amount}`).join("\n");
+            let csv = "Date,Category,Amount\n" + expenses.map(e => `"${e.date}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `spending_export.csv`;
+            a.download = `Export.csv`;
             a.click();
         }
 

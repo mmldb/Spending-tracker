@@ -8,71 +8,79 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #000000; color: #ffffff; -webkit-tap-highlight-color: transparent; }
-        .category-chip { transition: all 0.2s; border: 1px solid #27272a; }
-        .category-chip:active { transform: scale(0.95); background-color: #d4ff70; color: black; }
-        .active-edit { border-color: #d4ff70 !important; color: #d4ff70 !important; box-shadow: 0 0 10px rgba(212, 255, 112, 0.2); }
+        .bento-item { border-radius: 18px; margin-bottom: 8px; transition: all 0.2s; border: 1px solid rgba(255,255,255,0.05); }
+        .category-chip { transition: all 0.2s; border: 1px solid #1c1c1e; background: #1c1c1e; }
+        .category-chip:active { transform: scale(0.95); background: #ffffff; color: #000000; }
+        .active-edit { border-color: #ffffff !important; box-shadow: 0 0 15px rgba(255, 255, 255, 0.2); }
         .hidden-grid { display: none !important; }
-        * { -webkit-tap-highlight-color: transparent; }
         input::placeholder { color: #27272a; }
         
-        /* Progress Bar Animation */
-        .progress-bar { height: 6px; border-radius: 3px; background: #1c1c1e; overflow: hidden; margin-top: 8px; }
-        .progress-fill { height: 100%; background: #d4ff70; transition: width 0.8s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
+        /* Summary Bars */
+        .progress-bar { height: 8px; border-radius: 4px; background: #1c1c1e; overflow: hidden; margin-top: 10px; }
+        .progress-fill { height: 100%; transition: width 1s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
     </style>
 </head>
 <body class="p-6 font-sans">
     <div class="max-w-md mx-auto">
         
-        <div class="flex justify-between items-start mb-10 px-1">
+        <div class="flex justify-between items-start mb-10">
             <div class="flex flex-col">
-                <span id="headerLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Total Spent</span>
-                <h2 id="totalDisplay" class="text-3xl font-bold tabular-nums text-zinc-200">0 Ft</h2>
+                <span id="headerLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Portfolio Value</span>
+                <h2 id="totalDisplay" class="text-3xl font-bold tabular-nums text-zinc-200 tracking-tighter">0 Ft</h2>
             </div>
-            <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-400 active:scale-95 transition-all">
-                Summary
-            </button>
+            <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 border border-zinc-800 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400">Summary</button>
         </div>
 
-        <div id="inputSection" class="mb-8">
-            <div class="flex justify-between items-end mb-4 text-[10px] font-black uppercase tracking-widest text-zinc-600">
-                <span>Amount</span>
-                <button onclick="addNewCategory()" class="text-zinc-500 hover:text-white font-bold tracking-tighter text-[9px]">+ Add Category</button>
+        <div id="inputSection" class="mb-12">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-600">Enter Amount</span>
+                <button onclick="addNewCategory()" class="text-zinc-500 font-bold text-[10px] uppercase tracking-tighter">+ Category</button>
             </div>
             <input id="amount" type="text" inputmode="decimal" placeholder="0" 
-                class="w-full bg-transparent border-b border-zinc-900 py-4 text-5xl font-medium outline-none focus:border-zinc-700 transition-colors mb-8 text-white">
+                class="w-full bg-transparent border-b border-zinc-900 py-6 text-6xl font-medium outline-none focus:border-zinc-700 transition-colors mb-10 text-white">
             <div id="categoryGrid" class="grid grid-cols-3 gap-2 hidden-grid"></div>
         </div>
 
         <div id="activityView">
-            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-6 font-bold">Recent Activity</h3>
-            <ul id="expenseList" class="space-y-6"></ul>
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-4 ml-1">Recent Activity</h3>
+            <ul id="expenseList" class="space-y-1"></ul>
         </div>
 
         <div id="summaryView" class="hidden-grid">
-            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-6 font-bold">Category Distribution</h3>
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-6">Visual Breakdown</h3>
             <ul id="summaryList" class="space-y-8"></ul>
         </div>
 
-        <div class="mt-20 flex justify-between items-center opacity-20">
-            <button onclick="exportToCSV()" class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Export CSV</button>
-            <button onclick="clearAll()" class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Wipe Data</button>
+        <div class="mt-24 flex justify-between items-center opacity-10">
+            <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest">CSV</button>
+            <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest">Reset</button>
         </div>
     </div>
 
     <script>
+        const PALETTE = ['#d4ff70', '#a29bfe', '#ff7675', '#74b9ff', '#fd79a8', '#55efc4'];
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
-        let categories = JSON.parse(localStorage.getItem('categories')) || ['Food', 'Tech', 'Travel', 'Rent', 'Health'];
+        let categories = JSON.parse(localStorage.getItem('categories')) || ['Food', 'Tech', 'Travel', 'Rent'];
         let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
+        let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
         let currentEditCat = null;
         let isSummaryMode = false;
+
+        function getColor(cat) {
+            if (!categoryColors[cat]) {
+                categoryColors[cat] = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+                localStorage.setItem('categoryColors', JSON.stringify(categoryColors));
+            }
+            return categoryColors[cat];
+        }
 
         const amountInput = document.getElementById('amount');
         const categoryGrid = document.getElementById('categoryGrid');
 
         amountInput.addEventListener('input', (e) => {
-            let value = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
-            if (value.length > 0) {
-                e.target.value = Number(value).toLocaleString('hu-HU').replace(/,/g, ' ');
+            let val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
+            if (val.length > 0) {
+                e.target.value = Number(val).toLocaleString('hu-HU').replace(/,/g, ' ');
                 categoryGrid.classList.remove('hidden-grid');
                 renderCategories();
             } else {
@@ -82,21 +90,18 @@
         });
 
         function renderCategories() {
-            const sortedCats = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
-            categoryGrid.innerHTML = sortedCats.map(c => `
-                <button onclick="saveTransaction('${c}')" class="category-chip py-4 rounded-xl text-[10px] font-bold uppercase bg-zinc-900/30 text-zinc-500 ${c === currentEditCat ? 'active-edit' : ''}">
+            const sorted = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
+            categoryGrid.innerHTML = sorted.map(c => `
+                <button onclick="saveTransaction('${c}')" class="category-chip py-4 rounded-2xl text-[10px] font-bold uppercase text-zinc-400 ${c === currentEditCat ? 'active-edit' : ''}">
                     ${c}
                 </button>
             `).join('');
         }
 
         function saveTransaction(cat) {
-            const rawValue = amountInput.value.replace(/\s+/g, '');
-            if(!rawValue) return;
-            expenses.push({ 
-                category: cat, amount: parseFloat(rawValue), 
-                date: new Date().toLocaleDateString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) 
-            });
+            const raw = amountInput.value.replace(/\s+/g, '');
+            if(!raw) return;
+            expenses.push({ category: cat, amount: parseFloat(raw), date: new Date().toLocaleDateString('hu-HU', { month: '2-digit', day: '2-digit' }), color: getColor(cat) });
             categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
             amountInput.value = '';
             currentEditCat = null;
@@ -110,56 +115,45 @@
             document.getElementById('activityView').classList.toggle('hidden-grid', isSummaryMode);
             document.getElementById('summaryView').classList.toggle('hidden-grid', !isSummaryMode);
             document.getElementById('viewBtn').innerText = isSummaryMode ? "Activity" : "Summary";
-            document.getElementById('headerLabel').innerText = isSummaryMode ? "Total Overview" : "Total Spent";
             if(isSummaryMode) renderSummary();
         }
 
         function renderSummary() {
             const list = document.getElementById('summaryList');
             const totals = {};
-            let grandTotal = 0;
-            
-            expenses.forEach(e => {
-                totals[e.category] = (totals[e.category] || 0) + e.amount;
-                grandTotal += e.amount;
-            });
-
+            let grand = 0;
+            expenses.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; grand += e.amount; });
             const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
 
             list.innerHTML = sorted.map(([cat, amt]) => {
-                const percent = grandTotal > 0 ? (amt / grandTotal * 100).toFixed(0) : 0;
+                const p = grand > 0 ? (amt / grand * 100).toFixed(0) : 0;
+                const col = getColor(cat);
                 return `
                 <li>
-                    <div class="flex justify-between items-end mb-1">
-                        <span class="text-xs font-bold text-zinc-400 uppercase tracking-tighter">${cat}</span>
-                        <div class="text-right">
-                            <span class="text-[10px] text-zinc-600 font-bold mr-2">${percent}%</span>
-                            <span class="text-sm font-black text-zinc-200 tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
-                        </div>
+                    <div class="flex justify-between items-end mb-1 px-1">
+                        <span class="text-[11px] font-black uppercase text-zinc-500">${cat}</span>
+                        <span class="text-sm font-black tabular-nums text-zinc-200">${Number(amt).toLocaleString('hu-HU')} Ft</span>
                     </div>
-                    <div class="progress-bar"><div class="progress-fill" style="width: 0%" data-w="${percent}"></div></div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 0%; background:${col}" data-w="${p}"></div></div>
                 </li>`;
             }).join('');
-
-            // Animate bars
-            setTimeout(() => {
-                document.querySelectorAll('.progress-fill').forEach(el => el.style.width = el.dataset.w + '%');
-            }, 50);
+            setTimeout(() => { document.querySelectorAll('.progress-fill').forEach(el => el.style.width = el.dataset.w + '%'); }, 50);
         }
 
         function renderAll() {
             const list = document.getElementById('expenseList');
             list.innerHTML = [...expenses].reverse().map((e, i) => {
                 const idx = expenses.length - 1 - i;
+                const col = getColor(e.category);
                 return `
-                <li class="flex justify-between items-center">
+                <li class="bento-item p-4 flex justify-between items-center" style="background: ${col}15; border-left: 4px solid ${col}">
                     <button onclick="editEntry(${idx})" class="flex flex-col text-left">
-                        <span class="text-sm font-semibold text-zinc-400 underline decoration-zinc-900 underline-offset-4">${e.category}</span>
-                        <span class="text-[9px] text-zinc-700 font-bold uppercase">${e.date}</span>
+                        <span class="text-[13px] font-black uppercase tracking-tight" style="color: ${col}">${e.category}</span>
+                        <span class="text-[9px] text-zinc-600 font-bold">${e.date}</span>
                     </button>
                     <div class="flex items-center gap-4">
-                        <span class="font-bold text-sm text-zinc-500 tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
-                        <button onclick="deleteEntry(${idx})" class="text-zinc-900 text-xl px-2">×</button>
+                        <span class="font-black text-sm text-zinc-300 tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
+                        <button onclick="deleteEntry(${idx})" class="text-zinc-800 text-xl font-light">×</button>
                     </div>
                 </li>`;
             }).join('');
@@ -180,15 +174,14 @@
             renderAll();
         }
 
-        function deleteEntry(i) { if(confirm("Delete entry?")) { expenses.splice(i, 1); renderAll(); } }
+        function deleteEntry(i) { if(confirm("Delete?")) { expenses.splice(i, 1); renderAll(); } }
         function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
-        function clearAll() { if(confirm("Wipe data?")) { expenses = []; renderAll(); } }
+        function clearAll() { if(confirm("Wipe?")) { expenses = []; renderAll(); } }
         function exportToCSV() {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${e.date}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = `Spending.csv`; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = `Spend.csv`; a.click();
         }
         renderAll();
     </script>

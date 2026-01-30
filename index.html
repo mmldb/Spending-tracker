@@ -8,16 +8,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #000000; color: #ffffff; -webkit-tap-highlight-color: transparent; }
-        .bento-item { border-radius: 18px; margin-bottom: 8px; transition: all 0.2s; border: 1px solid rgba(255,255,255,0.05); }
+        .bento-block { border-radius: 16px; margin-bottom: 8px; transition: transform 0.1s; }
+        .bento-block:active { transform: scale(0.98); }
         .category-chip { transition: all 0.2s; border: 1px solid #1c1c1e; background: #1c1c1e; }
-        .category-chip:active { transform: scale(0.95); background: #ffffff; color: #000000; }
-        .active-edit { border-color: #ffffff !important; box-shadow: 0 0 15px rgba(255, 255, 255, 0.2); }
+        .active-edit { border: 2px solid #ffffff !important; }
         .hidden-grid { display: none !important; }
+        * { -webkit-tap-highlight-color: transparent; }
         input::placeholder { color: #27272a; }
-        
-        /* Summary Bars */
-        .progress-bar { height: 8px; border-radius: 4px; background: #1c1c1e; overflow: hidden; margin-top: 10px; }
-        .progress-fill { height: 100%; transition: width 1s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
     </style>
 </head>
 <body class="p-6 font-sans">
@@ -28,7 +25,7 @@
                 <span id="headerLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Portfolio Value</span>
                 <h2 id="totalDisplay" class="text-3xl font-bold tabular-nums text-zinc-200 tracking-tighter">0 Ft</h2>
             </div>
-            <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 border border-zinc-800 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400">Summary</button>
+            <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 border border-zinc-800 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-400">Summary</button>
         </div>
 
         <div id="inputSection" class="mb-12">
@@ -48,7 +45,7 @@
 
         <div id="summaryView" class="hidden-grid">
             <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-6">Visual Breakdown</h3>
-            <ul id="summaryList" class="space-y-8"></ul>
+            <ul id="summaryList" class="space-y-2"></ul>
         </div>
 
         <div class="mt-24 flex justify-between items-center opacity-10">
@@ -58,9 +55,18 @@
     </div>
 
     <script>
-        const PALETTE = ['#d4ff70', '#a29bfe', '#ff7675', '#74b9ff', '#fd79a8', '#55efc4'];
+        // Your Custom Color Palette
+        const PALETTE = [
+            '#FF3300', // Deutsch Orange
+            '#FFCA00', // Sunny Yellow
+            '#FFCCFF', // Pink Lemonade
+            '#826E50', // Golden Rush
+            '#0A66DD', // Ocean Blue
+            '#ABEEFE'  // Sky Blue
+        ];
+
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
-        let categories = JSON.parse(localStorage.getItem('categories')) || ['Food', 'Tech', 'Travel', 'Rent'];
+        let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi'];
         let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
         let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
         let currentEditCat = null;
@@ -68,7 +74,10 @@
 
         function getColor(cat) {
             if (!categoryColors[cat]) {
-                categoryColors[cat] = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+                // Assign a color from palette and save it
+                const usedColors = Object.values(categoryColors);
+                const available = PALETTE.filter(c => !usedColors.includes(c));
+                categoryColors[cat] = available.length > 0 ? available[0] : PALETTE[Math.floor(Math.random() * PALETTE.length)];
                 localStorage.setItem('categoryColors', JSON.stringify(categoryColors));
             }
             return categoryColors[cat];
@@ -101,7 +110,12 @@
         function saveTransaction(cat) {
             const raw = amountInput.value.replace(/\s+/g, '');
             if(!raw) return;
-            expenses.push({ category: cat, amount: parseFloat(raw), date: new Date().toLocaleDateString('hu-HU', { month: '2-digit', day: '2-digit' }), color: getColor(cat) });
+            expenses.push({ 
+                category: cat, 
+                amount: parseFloat(raw), 
+                date: new Date().toLocaleDateString('hu-HU', { month: '2-digit', day: '2-digit' }),
+                color: getColor(cat)
+            });
             categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
             amountInput.value = '';
             currentEditCat = null;
@@ -128,16 +142,16 @@
             list.innerHTML = sorted.map(([cat, amt]) => {
                 const p = grand > 0 ? (amt / grand * 100).toFixed(0) : 0;
                 const col = getColor(cat);
+                const textColor = (col === '#FFCCFF' || col === '#ABEEFE' || col === '#FFCA00') ? '#000000' : '#ffffff';
                 return `
-                <li>
-                    <div class="flex justify-between items-end mb-1 px-1">
-                        <span class="text-[11px] font-black uppercase text-zinc-500">${cat}</span>
-                        <span class="text-sm font-black tabular-nums text-zinc-200">${Number(amt).toLocaleString('hu-HU')} Ft</span>
+                <li class="bento-block p-5 flex justify-between items-center" style="background: ${col}; color: ${textColor}">
+                    <div class="flex flex-col">
+                        <span class="text-sm font-black uppercase tracking-tight">${cat}</span>
+                        <span class="text-[10px] font-bold opacity-60">${p}% of total</span>
                     </div>
-                    <div class="progress-bar"><div class="progress-fill" style="width: 0%; background:${col}" data-w="${p}"></div></div>
+                    <span class="text-lg font-black tabular-nums tracking-tighter">${Number(amt).toLocaleString('hu-HU')} Ft</span>
                 </li>`;
             }).join('');
-            setTimeout(() => { document.querySelectorAll('.progress-fill').forEach(el => el.style.width = el.dataset.w + '%'); }, 50);
         }
 
         function renderAll() {
@@ -145,15 +159,16 @@
             list.innerHTML = [...expenses].reverse().map((e, i) => {
                 const idx = expenses.length - 1 - i;
                 const col = getColor(e.category);
+                const textColor = (col === '#FFCCFF' || col === '#ABEEFE' || col === '#FFCA00') ? '#000000' : '#ffffff';
                 return `
-                <li class="bento-item p-4 flex justify-between items-center" style="background: ${col}15; border-left: 4px solid ${col}">
+                <li class="bento-block p-4 flex justify-between items-center" style="background: ${col}; color: ${textColor}">
                     <button onclick="editEntry(${idx})" class="flex flex-col text-left">
-                        <span class="text-[13px] font-black uppercase tracking-tight" style="color: ${col}">${e.category}</span>
-                        <span class="text-[9px] text-zinc-600 font-bold">${e.date}</span>
+                        <span class="text-[13px] font-black uppercase tracking-tight">${e.category}</span>
+                        <span class="text-[9px] font-bold opacity-60 uppercase">${e.date}</span>
                     </button>
                     <div class="flex items-center gap-4">
-                        <span class="font-black text-sm text-zinc-300 tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
-                        <button onclick="deleteEntry(${idx})" class="text-zinc-800 text-xl font-light">×</button>
+                        <span class="font-black text-sm tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
+                        <button onclick="deleteEntry(${idx})" class="text-xl opacity-40 font-light px-2">×</button>
                     </div>
                 </li>`;
             }).join('');
@@ -174,14 +189,14 @@
             renderAll();
         }
 
-        function deleteEntry(i) { if(confirm("Delete?")) { expenses.splice(i, 1); renderAll(); } }
-        function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
-        function clearAll() { if(confirm("Wipe?")) { expenses = []; renderAll(); } }
+        function deleteEntry(i) { if(confirm("Delete this entry?")) { expenses.splice(i, 1); renderAll(); if(isSummaryMode) renderSummary(); } }
+        function addNewCategory() { const n = prompt("Category Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
+        function clearAll() { if(confirm("Wipe all data?")) { expenses = []; renderAll(); } }
         function exportToCSV() {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${e.date}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `Spend.csv`; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = `Spending.csv`; a.click();
         }
         renderAll();
     </script>

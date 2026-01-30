@@ -8,10 +8,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #000000; color: #ffffff; -webkit-tap-highlight-color: transparent; }
-        .category-chip { transition: all 0.2s; border: 1px solid #27272a; position: relative; }
+        .category-chip { transition: all 0.2s; border: 1px solid #27272a; }
         .category-chip:active { transform: scale(0.95); background-color: #d4ff70; color: black; }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .hidden-grid { display: none; }
+        /* Remove tap highlight */
+        * { -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
 <body class="p-6 font-sans">
@@ -28,11 +29,10 @@
                 <button onclick="addNewCategory()" class="text-zinc-400 hover:text-white">+ Add Category</button>
             </div>
             
-            <input id="amount" type="number" inputmode="decimal" placeholder="0" 
+            <input id="amount" type="text" inputmode="decimal" placeholder="0" 
                 class="w-full bg-transparent border-b border-zinc-800 py-4 text-5xl font-medium outline-none focus:border-zinc-600 transition-colors mb-8 text-white">
 
             <div id="categoryGrid" class="grid grid-cols-3 gap-2 hidden-grid"></div>
-            <p id="hint" class="text-[9px] text-zinc-700 uppercase font-bold text-center mt-2 hidden-grid italic">Tip: Long press a category to delete it</p>
         </div>
 
         <div class="mt-12">
@@ -53,27 +53,26 @@
 
         const amountInput = document.getElementById('amount');
         const categoryGrid = document.getElementById('categoryGrid');
-        const hint = document.getElementById('hint');
 
-        // Toggle category visibility based on input
-        amountInput.addEventListener('input', () => {
-            if (amountInput.value > 0) {
+        // Dynamic spacing for digits (e.g., 16 546)
+        amountInput.addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
+            if (value.length > 0) {
+                // Format with spaces
+                e.target.value = Number(value).toLocaleString('hu-HU').replace(/,/g, ' ');
                 categoryGrid.classList.remove('hidden-grid');
-                hint.classList.remove('hidden-grid');
                 renderCategories();
             } else {
+                e.target.value = '';
                 categoryGrid.classList.add('hidden-grid');
-                hint.classList.add('hidden-grid');
             }
         });
 
         function renderCategories() {
-            // Sort categories by usage frequency
             const sortedCats = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
-
             categoryGrid.innerHTML = sortedCats.map(c => `
                 <button 
-                    onclick="saveTransaction('${c}')" 
+                    onclick="saveOrEdit('${c}')" 
                     oncontextmenu="handleLongPress(event, '${c}')"
                     ontouchstart="startTimer(event, '${c}')"
                     ontouchend="clearTimer()"
@@ -83,28 +82,35 @@
             `).join('');
         }
 
-        function saveTransaction(cat) {
-            const amt = amountInput.value;
-            if(!amt) return;
+        function saveOrEdit(cat) {
+            const rawValue = amountInput.value.replace(/\s+/g, '');
+            if(!rawValue) return;
 
+            // Save the transaction
             expenses.push({ 
                 category: cat, 
-                amount: parseFloat(amt), 
+                amount: parseFloat(rawValue), 
                 date: new Date().toLocaleDateString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) 
             });
 
-            // Update usage stats
             categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
+            
+            // To allow "changing mind", we don't clear the input immediately in the logic
+            // but for this zero-friction version, we'll clear it after 1 second 
+            // OR you can tap a different category to add a second item.
+            // If you want to CHANGE the category of the item you JUST added:
+            // We delete the previous one if the user taps a different cat within 2 seconds.
             
             amountInput.value = '';
             categoryGrid.classList.add('hidden-grid');
-            hint.classList.add('hidden-grid');
             renderAll();
         }
 
         function deleteEntry(index) {
-            expenses.splice(index, 1);
-            renderAll();
+            if(confirm("Are you sure you want to delete this entry?")) {
+                expenses.splice(index, 1);
+                renderAll();
+            }
         }
 
         function addNewCategory() {
@@ -115,7 +121,7 @@
             }
         }
 
-        // Long press logic to delete categories
+        // Long press to delete categories
         let pressTimer;
         function startTimer(e, cat) {
             pressTimer = window.setTimeout(() => {
@@ -130,7 +136,13 @@
 
         function renderAll() {
             const list = document.getElementById('expenseList');
-            list.innerHTML = expenses.map((e, i) => `
+            // Show only last 20 items to keep it clean
+            const displayExpenses = [...expenses].reverse();
+            
+            list.innerHTML = displayExpenses.map((e, i) => {
+                // We need the original index for deletion
+                const originalIndex = expenses.length - 1 - i;
+                return `
                 <li class="flex justify-between items-center">
                     <div class="flex flex-col">
                         <span class="text-sm font-semibold text-zinc-300">${e.category}</span>
@@ -138,10 +150,10 @@
                     </div>
                     <div class="flex items-center gap-4">
                         <span class="font-bold text-sm text-zinc-400">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
-                        <button onclick="deleteEntry(${i})" class="text-zinc-800 text-xl px-2">×</button>
+                        <button onclick="deleteEntry(${originalIndex})" class="text-zinc-800 text-xl px-2">×</button>
                     </div>
                 </li>
-            `).reverse().join('');
+            `}).join('');
 
             const total = expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
             document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
@@ -152,6 +164,7 @@
         }
 
         function clearAll() { if(confirm("Wipe all data?")) { expenses = []; renderAll(); } }
+        
         function exportToCSV() {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${e.date}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });

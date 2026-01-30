@@ -11,7 +11,6 @@
         .category-chip { transition: all 0.2s; border: 1px solid #27272a; }
         .category-chip:active { transform: scale(0.95); background-color: #d4ff70; color: black; }
         .hidden-grid { display: none; }
-        /* Remove tap highlight */
         * { -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
@@ -26,7 +25,7 @@
         <div class="mb-8">
             <div class="flex justify-between items-end mb-4 text-[10px] font-black uppercase tracking-widest text-zinc-500">
                 <span>Amount</span>
-                <button onclick="addNewCategory()" class="text-zinc-400 hover:text-white">+ Add Category</button>
+                <button onclick="addNewCategory()" class="text-zinc-400 hover:text-white font-bold">+ Add Category</button>
             </div>
             
             <input id="amount" type="text" inputmode="decimal" placeholder="0" 
@@ -36,7 +35,8 @@
         </div>
 
         <div class="mt-12">
-            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-6">Recent Activity</h3>
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-6 font-bold">Recent Activity</h3>
+            <p class="text-[8px] text-zinc-700 uppercase mb-4 italic">Tip: Tap a category name to edit/change it</p>
             <ul id="expenseList" class="space-y-6"></ul>
             
             <div class="mt-16 flex justify-between items-center opacity-30">
@@ -54,11 +54,10 @@
         const amountInput = document.getElementById('amount');
         const categoryGrid = document.getElementById('categoryGrid');
 
-        // Dynamic spacing for digits (e.g., 16 546)
+        // Number formatting with spaces (e.g. 1 500 000)
         amountInput.addEventListener('input', (e) => {
             let value = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
             if (value.length > 0) {
-                // Format with spaces
                 e.target.value = Number(value).toLocaleString('hu-HU').replace(/,/g, ' ');
                 categoryGrid.classList.remove('hidden-grid');
                 renderCategories();
@@ -72,7 +71,7 @@
             const sortedCats = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
             categoryGrid.innerHTML = sortedCats.map(c => `
                 <button 
-                    onclick="saveOrEdit('${c}')" 
+                    onclick="saveTransaction('${c}')" 
                     oncontextmenu="handleLongPress(event, '${c}')"
                     ontouchstart="startTimer(event, '${c}')"
                     ontouchend="clearTimer()"
@@ -82,11 +81,10 @@
             `).join('');
         }
 
-        function saveOrEdit(cat) {
+        function saveTransaction(cat) {
             const rawValue = amountInput.value.replace(/\s+/g, '');
             if(!rawValue) return;
 
-            // Save the transaction
             expenses.push({ 
                 category: cat, 
                 amount: parseFloat(rawValue), 
@@ -94,20 +92,23 @@
             });
 
             categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
-            
-            // To allow "changing mind", we don't clear the input immediately in the logic
-            // but for this zero-friction version, we'll clear it after 1 second 
-            // OR you can tap a different category to add a second item.
-            // If you want to CHANGE the category of the item you JUST added:
-            // We delete the previous one if the user taps a different cat within 2 seconds.
-            
             amountInput.value = '';
             categoryGrid.classList.add('hidden-grid');
             renderAll();
         }
 
+        // Tapping the history item re-loads it into the input for editing
+        function editEntry(index) {
+            const item = expenses[index];
+            amountInput.value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
+            expenses.splice(index, 1); // Remove old version
+            categoryGrid.classList.remove('hidden-grid');
+            amountInput.focus();
+            renderAll();
+        }
+
         function deleteEntry(index) {
-            if(confirm("Are you sure you want to delete this entry?")) {
+            if(confirm("Delete this entry permanently?")) {
                 expenses.splice(index, 1);
                 renderAll();
             }
@@ -121,7 +122,6 @@
             }
         }
 
-        // Long press to delete categories
         let pressTimer;
         function startTimer(e, cat) {
             pressTimer = window.setTimeout(() => {
@@ -136,20 +136,18 @@
 
         function renderAll() {
             const list = document.getElementById('expenseList');
-            // Show only last 20 items to keep it clean
             const displayExpenses = [...expenses].reverse();
             
             list.innerHTML = displayExpenses.map((e, i) => {
-                // We need the original index for deletion
                 const originalIndex = expenses.length - 1 - i;
                 return `
                 <li class="flex justify-between items-center">
-                    <div class="flex flex-col">
-                        <span class="text-sm font-semibold text-zinc-300">${e.category}</span>
+                    <button onclick="editEntry(${originalIndex})" class="flex flex-col text-left active:opacity-50 transition-opacity">
+                        <span class="text-sm font-semibold text-zinc-300 underline decoration-zinc-800 underline-offset-4">${e.category}</span>
                         <span class="text-[9px] text-zinc-600 font-bold uppercase">${e.date}</span>
-                    </div>
+                    </button>
                     <div class="flex items-center gap-4">
-                        <span class="font-bold text-sm text-zinc-400">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
+                        <span class="font-bold text-sm text-zinc-400 tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
                         <button onclick="deleteEntry(${originalIndex})" class="text-zinc-800 text-xl px-2">×</button>
                     </div>
                 </li>

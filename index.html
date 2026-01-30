@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpendTracker</title>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-4 bg-gray-100">
+    <div class="max-w-md mx-auto">
+        <h1 class="text-3xl font-bold text-blue-600 mb-2">SpendTracker</h1>
+        <div class="bg-blue-600 text-white p-4 rounded-xl mb-6 shadow-lg">
+            <p class="text-sm opacity-80">Total Spent This Month</p>
+            <h2 id="totalDisplay" class="text-3xl font-bold">$0.00</h2>
+        </div>
+        
+        <div class="bg-white p-6 rounded-xl shadow-md mb-6">
+            <input id="item" type="text" placeholder="Item name" class="w-full mb-3 p-3 border rounded-lg">
+            <input id="amount" type="number" placeholder="Amount ($)" class="w-full mb-3 p-3 border rounded-lg">
+            <button onclick="addExpense()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold">Add Expense</button>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-md">
+            <h3 class="font-bold mb-4 border-b pb-2">History</h3>
+            <ul id="expenseList" class="space-y-3 mb-6"></ul>
+            <button onclick="exportToCSV()" class="w-full bg-green-500 text-white p-3 rounded-lg font-bold text-sm">Export to Google Sheets (CSV)</button>
+        </div>
+    </div>
+
+    <script>
+        let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+
+        function render() {
+            const list = document.getElementById('expenseList');
+            const totalDisplay = document.getElementById('totalDisplay');
+            
+            list.innerHTML = expenses.map((e, i) => `
+                <li class="flex justify-between border-b border-gray-50 pb-2">
+                    <span class="text-gray-600">${e.item}</span>
+                    <span class="font-bold">$${e.amount}</span>
+                </li>
+            `).reverse().join('');
+
+            const total = expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+            totalDisplay.innerText = `$${total.toFixed(2)}`;
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+        }
+
+        function addExpense() {
+            const item = document.getElementById('item').value;
+            const amount = document.getElementById('amount').value;
+            if(!item || !amount) return;
+
+            expenses.push({ item, amount: parseFloat(amount).toFixed(2), date: new Date().toLocaleDateString() });
+            document.getElementById('item').value = '';
+            document.getElementById('amount').value = '';
+            render();
+        }
+
+        function exportToCSV() {
+            if (expenses.length === 0) return;
+            let csv = "Date,Item,Amount\n" + expenses.map(e => `${e.date},${e.item},${e.amount}`).join("\n");
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `spending-${new Date().getMonth()+1}.csv`;
+            a.click();
+        }
+
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js');
+        }
+
+        render();
+    </script>
+</body>
+</html>

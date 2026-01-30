@@ -7,19 +7,19 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #000000; color: #ffffff; -webkit-tap-highlight-color: transparent; }
+        body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; }
         
-        /* The "Schedule" Stack - No gaps, solid blocks */
+        /* Solid Stack - No Gaps */
         .stack-item { border-radius: 0; margin-bottom: 0; border: none; }
         .stack-item:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
         .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; }
         
         .category-chip { transition: all 0.2s; border: none; font-weight: 900; }
-        .active-edit { outline: 3px solid #ffffff; z-index: 10; }
+        .active-edit { outline: 3px solid #FFFFFF; z-index: 10; }
         .hidden-grid { display: none !important; }
         
-        /* Summary Bars Animation */
-        .progress-bar { height: 12px; border-radius: 6px; background: #1c1c1e; overflow: hidden; margin-top: 10px; }
+        /* Animated Summary Pillars */
+        .progress-bar { height: 14px; border-radius: 7px; background: #1c1c1e; overflow: hidden; margin-top: 12px; }
         .progress-fill { height: 100%; transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
         
         input::placeholder { color: #27272a; }
@@ -29,7 +29,7 @@
     <div class="max-w-md mx-auto">
         
         <div class="flex justify-between items-start mb-10">
-            <div class="flex flex-col">
+            <div class="flex flex-col text-left">
                 <span id="headerLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Total Balance</span>
                 <h2 id="totalDisplay" class="text-4xl font-black tabular-nums tracking-tighter text-white">0 Ft</h2>
             </div>
@@ -38,8 +38,8 @@
 
         <div id="inputSection" class="mb-12">
             <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-600">Enter Amount</span>
-                <button onclick="addNewCategory()" class="text-zinc-500 font-bold text-[10px] uppercase tracking-tighter">+ Category</button>
+                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-600 font-bold">Enter Amount</span>
+                <button onclick="addNewCategory()" class="text-zinc-500 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
             </div>
             <input id="amount" type="text" inputmode="decimal" placeholder="0" 
                 class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-8 text-white">
@@ -48,24 +48,24 @@
         </div>
 
         <div id="activityView">
-            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-4">Activity</h3>
-            <ul id="expenseList" class="flex flex-col"></ul>
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-4">Recent Activity</h3>
+            <ul id="expenseList" class="flex flex-col shadow-2xl"></ul>
         </div>
 
         <div id="summaryView" class="hidden-grid">
-            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-6">Breakdown</h3>
-            <ul id="summaryList" class="space-y-8"></ul>
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-6">Visual Breakdown</h3>
+            <ul id="summaryList" class="space-y-4"></ul>
         </div>
 
         <div class="mt-24 flex justify-between items-center opacity-20">
             <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest">Export CSV</button>
-            <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest text-red-900">Reset</button>
+            <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest text-red-900">Reset Data</button>
         </div>
     </div>
 
     <script>
-        // Exact Palette from your image
-        const PALETTE = ['#FF3300', '#FFCA00', '#FFCCFF', '#826E50', '#0A66DD', '#ABEEFE'];
+        // YOUR PRECISE PALETTE
+        const PALETTE = ['#FF3390', '#FFCA00', '#FFCCFF', '#826E50', '#0A66Dd', '#ABEEFE', '#F8F8F2'];
         
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
         let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi'];
@@ -99,7 +99,7 @@
         function renderCategories() {
             categoryGrid.innerHTML = categories.map(c => {
                 const col = getColor(c);
-                const txt = (col === '#FFCCFF' || col === '#ABEEFE' || col === '#FFCA00') ? '#000000' : '#ffffff';
+                const txt = (col === '#FFCCFF' || col === '#ABEEFE' || col === '#FFCA00' || col === '#F8F8F2') ? '#000000' : '#FFFFFF';
                 return `
                 <button onclick="saveTransaction('${c}')" 
                     style="background: ${col}; color: ${txt}"
@@ -142,13 +142,14 @@
             list.innerHTML = sorted.map(([cat, amt]) => {
                 const p = grand > 0 ? (amt / grand * 100).toFixed(0) : 0;
                 const col = getColor(cat);
+                const txt = (col === '#FFCCFF' || col === '#ABEEFE' || col === '#FFCA00' || col === '#F8F8F2') ? '#000000' : '#FFFFFF';
                 return `
                 <li>
-                    <div class="flex justify-between items-end mb-1 px-1">
-                        <span class="text-xs font-black uppercase tracking-widest text-zinc-500">${cat}</span>
+                    <div class="flex justify-between items-center p-4 rounded-xl" style="background: ${col}; color: ${txt}">
+                        <span class="text-sm font-black uppercase tracking-tight">${cat}</span>
                         <div class="text-right">
-                            <span class="text-[10px] text-zinc-700 font-black mr-2">${p}%</span>
-                            <span class="text-sm font-black text-white">${Number(amt).toLocaleString('hu-HU')} Ft</span>
+                            <span class="text-[10px] font-black opacity-60 mr-2">${p}%</span>
+                            <span class="text-md font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
                         </div>
                     </div>
                     <div class="progress-bar"><div class="progress-fill" style="width: 0%; background:${col}" data-w="${p}"></div></div>
@@ -162,7 +163,7 @@
             list.innerHTML = [...expenses].reverse().map((e, i) => {
                 const idx = expenses.length - 1 - i;
                 const col = getColor(e.category);
-                const txt = (col === '#FFCCFF' || col === '#ABEEFE' || col === '#FFCA00') ? '#000000' : '#ffffff';
+                const txt = (col === '#FFCCFF' || col === '#ABEEFE' || col === '#FFCA00' || col === '#F8F8F2') ? '#000000' : '#FFFFFF';
                 return `
                 <li class="stack-item p-5 flex justify-between items-center" style="background: ${col}; color: ${txt}">
                     <button onclick="editEntry(${idx})" class="flex flex-col text-left">
@@ -190,14 +191,15 @@
             renderAll();
         }
 
-        function deleteEntry(i) { if(confirm("Delete?")) { expenses.splice(i, 1); renderAll(); } }
+        function deleteEntry(i) { if(confirm("Delete this entry?")) { expenses.splice(i, 1); renderAll(); } }
         function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
         function clearAll() { if(confirm("Wipe all data?")) { expenses = []; renderAll(); } }
+        
         function exportToCSV() {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${e.date}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `Spending.csv`; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = `Spending_Report.csv`; a.click();
         }
         renderAll();
     </script>

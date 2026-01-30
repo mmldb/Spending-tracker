@@ -3,68 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpendTracker</title>
+    <title>SpendTracker Pro</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #000000; color: #ffffff; }
+        .bento-card { background-color: #1c1c1e; border-radius: 24px; transition: transform 0.2s; }
+        .accent-green { background-color: #d4ff70; color: #000000; } /* Inspired by your image's growth card */
+        .accent-purple { background-color: #a29bfe; color: #000000; }
+        .accent-orange { background-color: #ff7675; color: #ffffff; }
+    </style>
 </head>
-<body class="p-4 bg-gray-100 text-gray-900 font-sans">
+<body class="p-4 pb-12 font-sans">
     <div class="max-w-md mx-auto">
-        <h1 class="text-3xl font-bold text-blue-600 mb-2">SpendTracker</h1>
         
-        <div class="bg-blue-600 text-white p-6 rounded-2xl mb-6 shadow-lg">
-            <p class="text-sm opacity-80 uppercase font-semibold">Total Spent</p>
-            <h2 id="totalDisplay" class="text-4xl font-bold">$0.00</h2>
+        <div class="flex justify-between items-center mb-6 px-2">
+            <h1 class="text-xl font-bold tracking-tight text-gray-400 uppercase text-xs">Your Spending</h1>
+            <div class="bg-zinc-800 px-3 py-1 rounded-full text-[10px] font-bold">HUF (Ft)</div>
         </div>
-        
-        <div class="bg-white p-6 rounded-2xl shadow-md mb-6">
-            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Select Category</label>
-            <select id="categorySelect" class="w-full mb-4 p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500"></select>
 
-            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Amount ($)</label>
-            <input id="amount" type="number" inputmode="decimal" placeholder="0.00" class="w-full mb-4 p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
+        <div class="bento-card accent-green p-8 mb-4 shadow-2xl">
+            <p class="text-xs font-black uppercase tracking-widest opacity-70 mb-1">Total This Month</p>
+            <h2 id="totalDisplay" class="text-5xl font-black tabular-nums tracking-tighter">0 Ft</h2>
+        </div>
+
+        <div class="bento-card p-6 mb-4">
+            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Category</label>
+            <select id="categorySelect" class="w-full mb-4 p-4 bg-zinc-900 border-none rounded-2xl text-white font-bold outline-none ring-1 ring-zinc-800 focus:ring-2 focus:ring-lime-300"></select>
+
+            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Amount</label>
+            <input id="amount" type="number" inputmode="decimal" placeholder="0" class="w-full mb-6 p-4 bg-zinc-900 border-none rounded-2xl text-white text-2xl font-black outline-none ring-1 ring-zinc-800 focus:ring-2 focus:ring-lime-300">
             
-            <button onclick="addExpense()" class="w-full bg-blue-600 text-white p-4 rounded-xl font-bold shadow-md active:scale-95 transition-transform">
-                Add Expense
+            <button onclick="addExpense()" class="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest active:scale-95 transition-all">
+                Add Transaction
             </button>
         </div>
 
-        <div class="bg-gray-200 p-4 rounded-2xl mb-6">
-            <details>
-                <summary class="text-sm font-bold text-gray-600 cursor-pointer">⚙️ Manage My Categories</summary>
-                <div class="mt-3 flex gap-2">
-                    <input id="newCatInput" type="text" placeholder="New category name" class="flex-1 p-2 border rounded-lg text-sm">
-                    <button onclick="addNewCategory()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-bold">Add</button>
-                </div>
-                <div id="catList" class="mt-2 flex flex-wrap gap-2"></div>
-            </details>
+        <div class="grid grid-cols-1 gap-4 mb-4">
+            <div class="bento-card p-6 bg-zinc-900">
+                <details class="group">
+                    <summary class="list-none cursor-pointer flex justify-between items-center">
+                        <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">⚙️ Customize Categories</span>
+                        <span class="text-gray-500 group-open:rotate-180 transition-transform">↓</span>
+                    </summary>
+                    <div class="mt-4 flex gap-2">
+                        <input id="newCatInput" type="text" placeholder="Rent..." class="flex-1 p-3 bg-black border-none rounded-xl text-sm text-white ring-1 ring-zinc-700">
+                        <button onclick="addNewCategory()" class="bg-white text-black px-4 py-2 rounded-xl text-xs font-black uppercase">Add</button>
+                    </div>
+                    <div id="catList" class="mt-4 flex flex-wrap gap-2"></div>
+                </details>
+            </div>
         </div>
 
-        <div class="bg-white p-6 rounded-2xl shadow-md">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-lg">History</h3>
-                <button onclick="clearAll()" class="text-xs text-red-500 font-semibold uppercase">Clear History</button>
+        <div class="bento-card p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="font-black text-xs uppercase tracking-widest text-gray-500">Activity History</h3>
+                <button onclick="clearAll()" class="text-[10px] text-zinc-600 font-bold uppercase hover:text-red-500">Reset</button>
             </div>
-            <ul id="expenseList" class="space-y-3 mb-6"></ul>
-            <button onclick="exportToCSV()" class="w-full bg-green-500 text-white p-3 rounded-xl font-bold text-sm">
-                Export to Google Sheets (CSV)
+            <ul id="expenseList" class="space-y-4 mb-8"></ul>
+            <button onclick="exportToCSV()" class="w-full bg-zinc-800 text-gray-300 p-4 rounded-2xl font-bold text-xs uppercase tracking-widest border border-zinc-700 active:bg-zinc-700">
+                Export to CSV
             </button>
         </div>
     </div>
 
     <script>
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
-        let categories = JSON.parse(localStorage.getItem('categories')) || ['General', 'Food', 'Transport'];
+        let categories = JSON.parse(localStorage.getItem('categories')) || ['Food', 'Tech', 'Travel'];
 
         function render() {
             // Render Categories Dropdown
             const select = document.getElementById('categorySelect');
             select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
 
-            // Render Category Chips (Management)
+            // Render Management Chips
             const catList = document.getElementById('catList');
             catList.innerHTML = categories.map((c, i) => `
-                <span class="bg-white px-2 py-1 rounded-md text-xs border flex items-center gap-1">
-                    ${c} <button onclick="deleteCategory(${i})" class="text-red-500 font-bold">×</button>
+                <span class="bg-zinc-800 px-3 py-1.5 rounded-full text-[10px] font-black uppercase flex items-center gap-2 border border-zinc-700">
+                    ${c} <button onclick="deleteCategory(${i})" class="text-red-500">×</button>
                 </span>
             `).join('');
 
@@ -73,17 +89,17 @@
             const totalDisplay = document.getElementById('totalDisplay');
             
             list.innerHTML = expenses.map((e, i) => `
-                <li class="flex justify-between items-center border-b border-gray-50 pb-2">
+                <li class="flex justify-between items-center">
                     <div class="flex flex-col">
-                        <span class="text-gray-800 font-medium">${e.item}</span>
-                        <span class="text-[10px] text-gray-400 uppercase font-bold">${e.date}</span>
+                        <span class="text-sm font-bold text-white">${e.item}</span>
+                        <span class="text-[9px] text-zinc-500 uppercase font-black tracking-tighter">${e.date}</span>
                     </div>
-                    <span class="font-bold text-gray-700">$${e.amount}</span>
+                    <span class="font-black text-sm">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
                 </li>
             `).reverse().join('');
 
             const total = expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
-            totalDisplay.innerText = `$${total.toFixed(2)}`;
+            totalDisplay.innerText = `${total.toLocaleString('hu-HU')} Ft`;
 
             localStorage.setItem('expenses', JSON.stringify(expenses));
             localStorage.setItem('categories', JSON.stringify(categories));
@@ -111,8 +127,8 @@
 
             expenses.push({ 
                 item, 
-                amount: parseFloat(amount).toFixed(2), 
-                date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+                amount: parseFloat(amount), 
+                date: new Date().toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' }) 
             });
             
             document.getElementById('amount').value = '';
@@ -120,7 +136,7 @@
         }
 
         function clearAll() {
-            if(confirm("Clear all spending history?")) {
+            if(confirm("Delete all history?")) {
                 expenses = [];
                 render();
             }
@@ -128,12 +144,12 @@
 
         function exportToCSV() {
             if (expenses.length === 0) return;
-            let csv = "Date,Category,Amount\n" + expenses.map(e => `${e.date},${e.item},${e.amount}`).join("\n");
+            let csv = "Date,Category,Amount_HUF\n" + expenses.map(e => `${e.date},${e.item},${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `spending.csv`;
+            a.download = `spending_export.csv`;
             a.click();
         }
 

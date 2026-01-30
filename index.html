@@ -8,11 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #000000; color: #ffffff; -webkit-tap-highlight-color: transparent; }
-        .category-chip { transition: all 0.2s; border: 1px solid #27272a; }
-        .category-chip.selected { background-color: #d4ff70; color: black; border-color: #d4ff70; }
+        .category-chip { transition: all 0.2s; border: 1px solid #27272a; position: relative; }
+        .category-chip:active { transform: scale(0.95); background-color: #d4ff70; color: black; }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .confirm-btn { animation: slideUp 0.3s ease-out; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .hidden-grid { display: none; }
     </style>
 </head>
 <body class="p-6 font-sans">
@@ -20,67 +19,126 @@
         
         <div class="flex flex-col mb-10 px-1">
             <span class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Total Spent</span>
-            <h2 id="totalDisplay" class="text-3xl font-bold tabular-nums">0 Ft</h2>
+            <h2 id="totalDisplay" class="text-3xl font-bold tabular-nums text-zinc-200">0 Ft</h2>
         </div>
 
         <div class="mb-8">
-            <div class="flex justify-between items-end mb-4">
-                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Amount & Category</span>
-                <button onclick="addNewCategory()" class="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-xl font-light text-zinc-500 active:bg-zinc-700">+</button>
+            <div class="flex justify-between items-end mb-4 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                <span>Amount</span>
+                <button onclick="addNewCategory()" class="text-zinc-400 hover:text-white">+ Add Category</button>
             </div>
             
             <input id="amount" type="number" inputmode="decimal" placeholder="0" 
-                class="w-full bg-transparent border-b border-zinc-800 py-4 text-4xl font-medium outline-none focus:border-zinc-500 transition-colors mb-6 text-white placeholder-zinc-800">
+                class="w-full bg-transparent border-b border-zinc-800 py-4 text-5xl font-medium outline-none focus:border-zinc-600 transition-colors mb-8 text-white">
 
-            <div id="categoryGrid" class="grid grid-cols-3 gap-2 opacity-30 transition-opacity duration-300"></div>
-
-            <div id="actionArea" class="h-16 mt-6"></div>
+            <div id="categoryGrid" class="grid grid-cols-3 gap-2 hidden-grid"></div>
+            <p id="hint" class="text-[9px] text-zinc-700 uppercase font-bold text-center mt-2 hidden-grid italic">Tip: Long press a category to delete it</p>
         </div>
 
         <div class="mt-12">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-500">History</h3>
-                <button onclick="exportToCSV()" class="text-[10px] font-bold text-zinc-500 border border-zinc-900 px-3 py-1 rounded-full uppercase">Export</button>
-            </div>
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-6">Recent Activity</h3>
             <ul id="expenseList" class="space-y-6"></ul>
-            <button onclick="clearAll()" class="w-full mt-20 py-4 text-[9px] font-black uppercase tracking-[0.3em] text-zinc-800">Clear Storage</button>
+            
+            <div class="mt-16 flex justify-between items-center opacity-30">
+                <button onclick="exportToCSV()" class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Export CSV</button>
+                <button onclick="clearAll()" class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Wipe Data</button>
+            </div>
         </div>
     </div>
 
     <script>
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
         let categories = JSON.parse(localStorage.getItem('categories')) || ['Food', 'Tech', 'Travel', 'Rent', 'Health'];
-        let selectedCategory = null;
+        let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
 
         const amountInput = document.getElementById('amount');
         const categoryGrid = document.getElementById('categoryGrid');
-        const actionArea = document.getElementById('actionArea');
+        const hint = document.getElementById('hint');
 
+        // Toggle category visibility based on input
         amountInput.addEventListener('input', () => {
-            categoryGrid.style.opacity = amountInput.value > 0 ? "1" : "0.3";
-            updateActionArea();
+            if (amountInput.value > 0) {
+                categoryGrid.classList.remove('hidden-grid');
+                hint.classList.remove('hidden-grid');
+                renderCategories();
+            } else {
+                categoryGrid.classList.add('hidden-grid');
+                hint.classList.add('hidden-grid');
+            }
         });
 
-        function render() {
-            // Render Categories
-            categoryGrid.innerHTML = categories.map(c => `
-                <button onclick="stageCategory('${c}')" id="cat-${c}" 
-                    class="category-chip py-3 rounded-xl text-[10px] font-bold uppercase tracking-tight bg-zinc-900/40 text-zinc-400 ${selectedCategory === c ? 'selected' : ''}">
+        function renderCategories() {
+            // Sort categories by usage frequency
+            const sortedCats = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
+
+            categoryGrid.innerHTML = sortedCats.map(c => `
+                <button 
+                    onclick="saveTransaction('${c}')" 
+                    oncontextmenu="handleLongPress(event, '${c}')"
+                    ontouchstart="startTimer(event, '${c}')"
+                    ontouchend="clearTimer()"
+                    class="category-chip py-4 rounded-xl text-[10px] font-bold uppercase bg-zinc-900/40 text-zinc-400">
                     ${c}
                 </button>
             `).join('');
+        }
 
-            // Render History
+        function saveTransaction(cat) {
+            const amt = amountInput.value;
+            if(!amt) return;
+
+            expenses.push({ 
+                category: cat, 
+                amount: parseFloat(amt), 
+                date: new Date().toLocaleDateString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) 
+            });
+
+            // Update usage stats
+            categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
+            
+            amountInput.value = '';
+            categoryGrid.classList.add('hidden-grid');
+            hint.classList.add('hidden-grid');
+            renderAll();
+        }
+
+        function deleteEntry(index) {
+            expenses.splice(index, 1);
+            renderAll();
+        }
+
+        function addNewCategory() {
+            const name = prompt("New Category Name:");
+            if(name && !categories.includes(name)) {
+                categories.push(name);
+                renderCategories();
+            }
+        }
+
+        // Long press logic to delete categories
+        let pressTimer;
+        function startTimer(e, cat) {
+            pressTimer = window.setTimeout(() => {
+                if(confirm(`Delete category "${cat}"?`)) {
+                    categories = categories.filter(c => c !== cat);
+                    renderCategories();
+                }
+            }, 800);
+        }
+        function clearTimer() { clearTimeout(pressTimer); }
+        function handleLongPress(e, cat) { e.preventDefault(); }
+
+        function renderAll() {
             const list = document.getElementById('expenseList');
             list.innerHTML = expenses.map((e, i) => `
                 <li class="flex justify-between items-center">
                     <div class="flex flex-col">
                         <span class="text-sm font-semibold text-zinc-300">${e.category}</span>
-                        <span class="text-[9px] text-zinc-600 font-bold uppercase tracking-tighter">${e.date}</span>
+                        <span class="text-[9px] text-zinc-600 font-bold uppercase">${e.date}</span>
                     </div>
                     <div class="flex items-center gap-4">
                         <span class="font-bold text-sm text-zinc-400">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
-                        <button onclick="deleteEntry(${i})" class="text-zinc-800 hover:text-red-500 text-xl px-1">×</button>
+                        <button onclick="deleteEntry(${i})" class="text-zinc-800 text-xl px-2">×</button>
                     </div>
                 </li>
             `).reverse().join('');
@@ -90,66 +148,19 @@
 
             localStorage.setItem('expenses', JSON.stringify(expenses));
             localStorage.setItem('categories', JSON.stringify(categories));
+            localStorage.setItem('categoryUsage', JSON.stringify(categoryUsage));
         }
 
-        function stageCategory(cat) {
-            if(!amountInput.value) return amountInput.focus();
-            selectedCategory = cat;
-            render();
-            updateActionArea();
-        }
-
-        function updateActionArea() {
-            if(amountInput.value > 0 && selectedCategory) {
-                actionArea.innerHTML = `
-                    <button onclick="confirmTransaction()" class="confirm-btn w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest text-xs">
-                        Confirm Transaction
-                    </button>
-                `;
-            } else {
-                actionArea.innerHTML = '';
-            }
-        }
-
-        function confirmTransaction() {
-            expenses.push({ 
-                category: selectedCategory, 
-                amount: parseFloat(amountInput.value), 
-                date: new Date().toLocaleDateString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) 
-            });
-            
-            amountInput.value = '';
-            selectedCategory = null;
-            render();
-            updateActionArea();
-        }
-
-        function deleteEntry(index) {
-            expenses.splice(index, 1);
-            render();
-        }
-
-        function addNewCategory() {
-            const name = prompt("New Category:");
-            if(name && !categories.includes(name)) {
-                categories.push(name);
-                render();
-            }
-        }
-
-        function clearAll() { if(confirm("Delete all?")) { expenses = []; render(); } }
-
+        function clearAll() { if(confirm("Wipe all data?")) { expenses = []; renderAll(); } }
         function exportToCSV() {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${e.date}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = `Export.csv`;
-            a.click();
+            a.href = url; a.download = `Spending.csv`; a.click();
         }
 
-        render();
+        renderAll();
     </script>
 </body>
 </html>

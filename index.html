@@ -7,71 +7,134 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="p-4 bg-gray-100">
+<body class="p-4 bg-gray-100 text-gray-900 font-sans">
     <div class="max-w-md mx-auto">
         <h1 class="text-3xl font-bold text-blue-600 mb-2">SpendTracker</h1>
-        <div class="bg-blue-600 text-white p-4 rounded-xl mb-6 shadow-lg">
-            <p class="text-sm opacity-80">Total Spent This Month</p>
-            <h2 id="totalDisplay" class="text-3xl font-bold">$0.00</h2>
+        
+        <div class="bg-blue-600 text-white p-6 rounded-2xl mb-6 shadow-lg">
+            <p class="text-sm opacity-80 uppercase font-semibold">Total Spent</p>
+            <h2 id="totalDisplay" class="text-4xl font-bold">$0.00</h2>
         </div>
         
-        <div class="bg-white p-6 rounded-xl shadow-md mb-6">
-            <input id="item" type="text" placeholder="Item name" class="w-full mb-3 p-3 border rounded-lg">
-            <input id="amount" type="number" placeholder="Amount ($)" class="w-full mb-3 p-3 border rounded-lg">
-            <button onclick="addExpense()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold">Add Expense</button>
+        <div class="bg-white p-6 rounded-2xl shadow-md mb-6">
+            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Select Category</label>
+            <select id="categorySelect" class="w-full mb-4 p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500"></select>
+
+            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Amount ($)</label>
+            <input id="amount" type="number" inputmode="decimal" placeholder="0.00" class="w-full mb-4 p-3 border rounded-xl bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
+            
+            <button onclick="addExpense()" class="w-full bg-blue-600 text-white p-4 rounded-xl font-bold shadow-md active:scale-95 transition-transform">
+                Add Expense
+            </button>
         </div>
 
-        <div class="bg-white p-6 rounded-xl shadow-md">
-            <h3 class="font-bold mb-4 border-b pb-2">History</h3>
+        <div class="bg-gray-200 p-4 rounded-2xl mb-6">
+            <details>
+                <summary class="text-sm font-bold text-gray-600 cursor-pointer">⚙️ Manage My Categories</summary>
+                <div class="mt-3 flex gap-2">
+                    <input id="newCatInput" type="text" placeholder="New category name" class="flex-1 p-2 border rounded-lg text-sm">
+                    <button onclick="addNewCategory()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-bold">Add</button>
+                </div>
+                <div id="catList" class="mt-2 flex flex-wrap gap-2"></div>
+            </details>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg">History</h3>
+                <button onclick="clearAll()" class="text-xs text-red-500 font-semibold uppercase">Clear History</button>
+            </div>
             <ul id="expenseList" class="space-y-3 mb-6"></ul>
-            <button onclick="exportToCSV()" class="w-full bg-green-500 text-white p-3 rounded-lg font-bold text-sm">Export to Google Sheets (CSV)</button>
+            <button onclick="exportToCSV()" class="w-full bg-green-500 text-white p-3 rounded-xl font-bold text-sm">
+                Export to Google Sheets (CSV)
+            </button>
         </div>
     </div>
 
     <script>
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+        let categories = JSON.parse(localStorage.getItem('categories')) || ['General', 'Food', 'Transport'];
 
         function render() {
+            // Render Categories Dropdown
+            const select = document.getElementById('categorySelect');
+            select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            // Render Category Chips (Management)
+            const catList = document.getElementById('catList');
+            catList.innerHTML = categories.map((c, i) => `
+                <span class="bg-white px-2 py-1 rounded-md text-xs border flex items-center gap-1">
+                    ${c} <button onclick="deleteCategory(${i})" class="text-red-500 font-bold">×</button>
+                </span>
+            `).join('');
+
+            // Render Expense List
             const list = document.getElementById('expenseList');
             const totalDisplay = document.getElementById('totalDisplay');
             
             list.innerHTML = expenses.map((e, i) => `
-                <li class="flex justify-between border-b border-gray-50 pb-2">
-                    <span class="text-gray-600">${e.item}</span>
-                    <span class="font-bold">$${e.amount}</span>
+                <li class="flex justify-between items-center border-b border-gray-50 pb-2">
+                    <div class="flex flex-col">
+                        <span class="text-gray-800 font-medium">${e.item}</span>
+                        <span class="text-[10px] text-gray-400 uppercase font-bold">${e.date}</span>
+                    </div>
+                    <span class="font-bold text-gray-700">$${e.amount}</span>
                 </li>
             `).reverse().join('');
 
             const total = expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
             totalDisplay.innerText = `$${total.toFixed(2)}`;
+
             localStorage.setItem('expenses', JSON.stringify(expenses));
+            localStorage.setItem('categories', JSON.stringify(categories));
+        }
+
+        function addNewCategory() {
+            const input = document.getElementById('newCatInput');
+            const val = input.value.trim();
+            if(val && !categories.includes(val)) {
+                categories.push(val);
+                input.value = '';
+                render();
+            }
+        }
+
+        function deleteCategory(index) {
+            categories.splice(index, 1);
+            render();
         }
 
         function addExpense() {
-            const item = document.getElementById('item').value;
+            const item = document.getElementById('categorySelect').value;
             const amount = document.getElementById('amount').value;
-            if(!item || !amount) return;
+            if(!amount || amount <= 0) return;
 
-            expenses.push({ item, amount: parseFloat(amount).toFixed(2), date: new Date().toLocaleDateString() });
-            document.getElementById('item').value = '';
+            expenses.push({ 
+                item, 
+                amount: parseFloat(amount).toFixed(2), 
+                date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+            });
+            
             document.getElementById('amount').value = '';
             render();
         }
 
+        function clearAll() {
+            if(confirm("Clear all spending history?")) {
+                expenses = [];
+                render();
+            }
+        }
+
         function exportToCSV() {
             if (expenses.length === 0) return;
-            let csv = "Date,Item,Amount\n" + expenses.map(e => `${e.date},${e.item},${e.amount}`).join("\n");
+            let csv = "Date,Category,Amount\n" + expenses.map(e => `${e.date},${e.item},${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `spending-${new Date().getMonth()+1}.csv`;
+            a.download = `spending.csv`;
             a.click();
-        }
-
-        // Register Service Worker for PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js');
         }
 
         render();

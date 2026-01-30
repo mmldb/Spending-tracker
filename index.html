@@ -3,23 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>SpendTracker Pro</title>
+    <title>SpendTracker Stealth</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; }
         
-        /* Solid Stack - No Gaps */
-        .stack-item { border-radius: 0; margin-bottom: 0; border: none; }
+        /* Solid Monochrome Stack */
+        .stack-item { border-radius: 0; margin-bottom: 0; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .stack-item:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
-        .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; }
+        .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; border-bottom: none; }
         
-        .category-chip { transition: all 0.2s; border: none; font-weight: 900; }
-        .active-edit { outline: 3px solid #FFFFFF; z-index: 10; }
+        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; }
+        .active-edit { border-color: #FFFFFF !important; background: #27272a !important; }
         .hidden-grid { display: none !important; }
         
-        /* Animated Summary Pillars */
-        .progress-bar { height: 14px; border-radius: 7px; background: #1c1c1e; overflow: hidden; margin-top: 12px; }
+        /* Grayscale Summary Pillars */
+        .progress-bar { height: 10px; border-radius: 5px; background: #1c1c1e; overflow: hidden; margin-top: 12px; }
         .progress-fill { height: 100%; transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
         
         input::placeholder { color: #27272a; }
@@ -30,16 +30,16 @@
         
         <div class="flex justify-between items-start mb-10">
             <div class="flex flex-col text-left">
-                <span id="headerLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Total Balance</span>
+                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Portfolio Value</span>
                 <h2 id="totalDisplay" class="text-4xl font-black tabular-nums tracking-tighter text-white">0 Ft</h2>
             </div>
-            <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400">Summary</button>
+            <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-800">Summary</button>
         </div>
 
         <div id="inputSection" class="mb-12">
             <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-600 font-bold">Enter Amount</span>
-                <button onclick="addNewCategory()" class="text-zinc-500 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
+                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Enter Amount</span>
+                <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
             </div>
             <input id="amount" type="text" inputmode="decimal" placeholder="0" 
                 class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-8 text-white">
@@ -48,24 +48,24 @@
         </div>
 
         <div id="activityView">
-            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-4">Recent Activity</h3>
-            <ul id="expenseList" class="flex flex-col shadow-2xl"></ul>
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-800 mb-4">Activity</h3>
+            <ul id="expenseList" class="flex flex-col"></ul>
         </div>
 
         <div id="summaryView" class="hidden-grid">
-            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-6">Visual Breakdown</h3>
-            <ul id="summaryList" class="space-y-4"></ul>
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-800 mb-6">Distribution</h3>
+            <ul id="summaryList" class="space-y-6"></ul>
         </div>
 
         <div class="mt-24 flex justify-between items-center opacity-20">
-            <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest">Export CSV</button>
-            <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest text-red-900">Reset Data</button>
+            <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest">CSV</button>
+            <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest">Reset</button>
         </div>
     </div>
 
     <script>
-        // YOUR PRECISE PALETTE
-        const PALETTE = ['#FF3390', '#FFCA00', '#FFCCFF', '#826E50', '#0A66Dd', '#ABEEFE', '#F8F8F2'];
+        // Monochrome Palette: Black, Grays, and White
+        const PALETTE = ['#1c1c1e', '#2c2c2e', '#3a3a3c', '#48484a', '#636366', '#8e8e93', '#c7c7cc', '#F8F8F2'];
         
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
         let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi'];
@@ -99,10 +99,10 @@
         function renderCategories() {
             categoryGrid.innerHTML = categories.map(c => {
                 const col = getColor(c);
-                const txt = (col === '#FFCCFF' || col === '#ABEEFE' || col === '#FFCA00' || col === '#F8F8F2') ? '#000000' : '#FFFFFF';
+                const isLight = col === '#c7c7cc' || col === '#F8F8F2' || col === '#8e8e93';
                 return `
                 <button onclick="saveTransaction('${c}')" 
-                    style="background: ${col}; color: ${txt}"
+                    style="background: ${col}; color: ${isLight ? '#000000' : '#FFFFFF'}"
                     class="category-chip py-5 rounded-lg text-[11px] font-black uppercase ${c === currentEditCat ? 'active-edit' : ''}">
                     ${c}
                 </button>`;
@@ -142,13 +142,13 @@
             list.innerHTML = sorted.map(([cat, amt]) => {
                 const p = grand > 0 ? (amt / grand * 100).toFixed(0) : 0;
                 const col = getColor(cat);
-                const txt = (col === '#FFCCFF' || col === '#ABEEFE' || col === '#FFCA00' || col === '#F8F8F2') ? '#000000' : '#FFFFFF';
+                const isLight = col === '#c7c7cc' || col === '#F8F8F2' || col === '#8e8e93';
                 return `
                 <li>
-                    <div class="flex justify-between items-center p-4 rounded-xl" style="background: ${col}; color: ${txt}">
+                    <div class="flex justify-between items-center p-5 rounded-2xl" style="background: ${col}; color: ${isLight ? '#000000' : '#FFFFFF'}">
                         <span class="text-sm font-black uppercase tracking-tight">${cat}</span>
                         <div class="text-right">
-                            <span class="text-[10px] font-black opacity-60 mr-2">${p}%</span>
+                            <span class="text-[10px] font-black opacity-40 mr-2">${p}%</span>
                             <span class="text-md font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
                         </div>
                     </div>
@@ -163,16 +163,16 @@
             list.innerHTML = [...expenses].reverse().map((e, i) => {
                 const idx = expenses.length - 1 - i;
                 const col = getColor(e.category);
-                const txt = (col === '#FFCCFF' || col === '#ABEEFE' || col === '#FFCA00' || col === '#F8F8F2') ? '#000000' : '#FFFFFF';
+                const isLight = col === '#c7c7cc' || col === '#F8F8F2' || col === '#8e8e93';
                 return `
-                <li class="stack-item p-5 flex justify-between items-center" style="background: ${col}; color: ${txt}">
+                <li class="stack-item p-6 flex justify-between items-center" style="background: ${col}; color: ${isLight ? '#000000' : '#FFFFFF'}">
                     <button onclick="editEntry(${idx})" class="flex flex-col text-left">
                         <span class="text-sm font-black uppercase tracking-tight">${e.category}</span>
-                        <span class="text-[9px] font-bold opacity-40">${e.date}</span>
+                        <span class="text-[9px] font-bold opacity-30 uppercase">${e.date}</span>
                     </button>
                     <div class="flex items-center gap-4">
                         <span class="font-black text-md tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
-                        <button onclick="deleteEntry(${idx})" class="text-2xl opacity-30 font-light px-2">×</button>
+                        <button onclick="deleteEntry(${idx})" class="text-2xl opacity-20 font-light px-2">×</button>
                     </div>
                 </li>`;
             }).join('');
@@ -191,15 +191,14 @@
             renderAll();
         }
 
-        function deleteEntry(i) { if(confirm("Delete this entry?")) { expenses.splice(i, 1); renderAll(); } }
+        function deleteEntry(i) { if(confirm("Delete entry?")) { expenses.splice(i, 1); renderAll(); } }
         function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
         function clearAll() { if(confirm("Wipe all data?")) { expenses = []; renderAll(); } }
-        
         function exportToCSV() {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${e.date}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `Spending_Report.csv`; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = `Stealth_Spend.csv`; a.click();
         }
         renderAll();
     </script>

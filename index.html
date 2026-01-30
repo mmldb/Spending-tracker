@@ -9,21 +9,28 @@
     <style>
         body { background-color: #000000; color: #ffffff; -webkit-tap-highlight-color: transparent; }
         .category-chip { transition: all 0.2s; border: 1px solid #27272a; }
-        .category-chip:active { transform: scale(0.95); background-color: #d4ff70; color: black; border-color: #d4ff70; }
+        .category-chip:active { transform: scale(0.95); background-color: #d4ff70; color: black; }
+        .active-edit { border-color: #d4ff70 !important; color: #d4ff70 !important; box-shadow: 0 0 10px rgba(212, 255, 112, 0.2); }
         .hidden-grid { display: none !important; }
         * { -webkit-tap-highlight-color: transparent; }
         input::placeholder { color: #27272a; }
+        .view-transition { transition: opacity 0.2s ease-in-out; }
     </style>
 </head>
 <body class="p-6 font-sans">
     <div class="max-w-md mx-auto">
         
-        <div class="flex flex-col mb-10 px-1">
-            <span class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1 text-zinc-600">Total Spent</span>
-            <h2 id="totalDisplay" class="text-3xl font-bold tabular-nums text-zinc-200">0 Ft</h2>
+        <div class="flex justify-between items-start mb-10 px-1">
+            <div class="flex flex-col">
+                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Total Spent</span>
+                <h2 id="totalDisplay" class="text-3xl font-bold tabular-nums text-zinc-200">0 Ft</h2>
+            </div>
+            <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-400 active:scale-95 transition-all">
+                Summary
+            </button>
         </div>
 
-        <div class="mb-8">
+        <div id="inputArea" class="mb-8">
             <div class="flex justify-between items-end mb-4 text-[10px] font-black uppercase tracking-widest text-zinc-600">
                 <span>Amount</span>
                 <button onclick="addNewCategory()" class="text-zinc-500 hover:text-white font-bold tracking-tighter text-[9px]">+ Add Category</button>
@@ -35,14 +42,19 @@
             <div id="categoryGrid" class="grid grid-cols-3 gap-2 hidden-grid"></div>
         </div>
 
-        <div class="mt-12">
+        <div id="activityView" class="view-transition">
             <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-6 font-bold">Recent Activity</h3>
             <ul id="expenseList" class="space-y-6"></ul>
-            
-            <div class="mt-20 flex justify-between items-center opacity-20">
-                <button onclick="exportToCSV()" class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Export CSV</button>
-                <button onclick="clearAll()" class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Wipe Data</button>
-            </div>
+        </div>
+
+        <div id="summaryView" class="view-transition hidden-grid">
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-6 font-bold">Category Totals</h3>
+            <ul id="summaryList" class="space-y-4"></ul>
+        </div>
+
+        <div class="mt-20 flex justify-between items-center opacity-20">
+            <button onclick="exportToCSV()" class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Export CSV</button>
+            <button onclick="clearAll()" class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Wipe Data</button>
         </div>
     </div>
 
@@ -50,11 +62,12 @@
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
         let categories = JSON.parse(localStorage.getItem('categories')) || ['Food', 'Tech', 'Travel', 'Rent', 'Health'];
         let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
+        let currentEditCat = null;
+        let isSummaryMode = false;
 
         const amountInput = document.getElementById('amount');
         const categoryGrid = document.getElementById('categoryGrid');
 
-        // Handles digit spacing and visibility
         amountInput.addEventListener('input', (e) => {
             let value = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
             if (value.length > 0) {
@@ -64,6 +77,7 @@
             } else {
                 e.target.value = '';
                 categoryGrid.classList.add('hidden-grid');
+                currentEditCat = null;
             }
         });
 
@@ -75,7 +89,7 @@
                     oncontextmenu="handleLongPress(event, '${c}')"
                     ontouchstart="startTimer(event, '${c}')"
                     ontouchend="clearTimer()"
-                    class="category-chip py-4 rounded-xl text-[10px] font-bold uppercase bg-zinc-900/30 text-zinc-500">
+                    class="category-chip py-4 rounded-xl text-[10px] font-bold uppercase bg-zinc-900/30 text-zinc-500 ${c === currentEditCat ? 'active-edit' : ''}">
                     ${c}
                 </button>
             `).join('');
@@ -91,21 +105,56 @@
                 date: new Date().toLocaleDateString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) 
             });
 
-            // Update usage stats for sorting
             categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
             
-            // IMMEDIATE RESET
             amountInput.value = '';
-            categoryGrid.classList.add('hidden-grid'); // This hides the grid immediately
+            currentEditCat = null;
+            categoryGrid.classList.add('hidden-grid');
             renderAll();
+        }
+
+        function toggleView() {
+            isSummaryMode = !isSummaryMode;
+            const actView = document.getElementById('activityView');
+            const sumView = document.getElementById('summaryView');
+            const viewBtn = document.getElementById('viewBtn');
+
+            if(isSummaryMode) {
+                actView.classList.add('hidden-grid');
+                sumView.classList.remove('hidden-grid');
+                viewBtn.innerText = "Activity";
+                renderSummary();
+            } else {
+                actView.classList.remove('hidden-grid');
+                sumView.classList.add('hidden-grid');
+                viewBtn.innerText = "Summary";
+            }
+        }
+
+        function renderSummary() {
+            const summaryList = document.getElementById('summaryList');
+            const totals = {};
+            
+            expenses.forEach(e => {
+                totals[e.category] = (totals[e.category] || 0) + e.amount;
+            });
+
+            const sortedTotals = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+
+            summaryList.innerHTML = sortedTotals.map(([cat, amt]) => `
+                <li class="flex justify-between items-center bg-zinc-900/30 p-4 rounded-2xl border border-zinc-900">
+                    <span class="text-sm font-bold text-zinc-400 uppercase tracking-tight">${cat}</span>
+                    <span class="text-sm font-black tabular-nums text-zinc-200">${Number(amt).toLocaleString('hu-HU')} Ft</span>
+                </li>
+            `).join('');
         }
 
         function editEntry(index) {
             const item = expenses[index];
+            currentEditCat = item.category;
             amountInput.value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
             expenses.splice(index, 1);
             
-            // Re-show grid for the edit
             categoryGrid.classList.remove('hidden-grid');
             renderCategories();
             amountInput.focus();
@@ -116,6 +165,7 @@
             if(confirm("Delete this entry?")) {
                 expenses.splice(index, 1);
                 renderAll();
+                if(isSummaryMode) renderSummary();
             }
         }
 
@@ -166,8 +216,7 @@
             localStorage.setItem('categoryUsage', JSON.stringify(categoryUsage));
         }
 
-        function clearAll() { if(confirm("Wipe all data?")) { expenses = []; renderAll(); } }
-        
+        function clearAll() { if(confirm("Wipe all data?")) { expenses = []; renderAll(); if(isSummaryMode) renderSummary(); } }
         function exportToCSV() {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${e.date}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });

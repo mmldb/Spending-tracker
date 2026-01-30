@@ -14,7 +14,10 @@
         .hidden-grid { display: none !important; }
         * { -webkit-tap-highlight-color: transparent; }
         input::placeholder { color: #27272a; }
-        .view-transition { transition: opacity 0.2s ease-in-out; }
+        
+        /* Progress Bar Animation */
+        .progress-bar { height: 6px; border-radius: 3px; background: #1c1c1e; overflow: hidden; margin-top: 8px; }
+        .progress-fill { height: 100%; background: #d4ff70; transition: width 0.8s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
     </style>
 </head>
 <body class="p-6 font-sans">
@@ -22,7 +25,7 @@
         
         <div class="flex justify-between items-start mb-10 px-1">
             <div class="flex flex-col">
-                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Total Spent</span>
+                <span id="headerLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Total Spent</span>
                 <h2 id="totalDisplay" class="text-3xl font-bold tabular-nums text-zinc-200">0 Ft</h2>
             </div>
             <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-400 active:scale-95 transition-all">
@@ -30,26 +33,24 @@
             </button>
         </div>
 
-        <div id="inputArea" class="mb-8">
+        <div id="inputSection" class="mb-8">
             <div class="flex justify-between items-end mb-4 text-[10px] font-black uppercase tracking-widest text-zinc-600">
                 <span>Amount</span>
                 <button onclick="addNewCategory()" class="text-zinc-500 hover:text-white font-bold tracking-tighter text-[9px]">+ Add Category</button>
             </div>
-            
             <input id="amount" type="text" inputmode="decimal" placeholder="0" 
                 class="w-full bg-transparent border-b border-zinc-900 py-4 text-5xl font-medium outline-none focus:border-zinc-700 transition-colors mb-8 text-white">
-
             <div id="categoryGrid" class="grid grid-cols-3 gap-2 hidden-grid"></div>
         </div>
 
-        <div id="activityView" class="view-transition">
+        <div id="activityView">
             <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-6 font-bold">Recent Activity</h3>
             <ul id="expenseList" class="space-y-6"></ul>
         </div>
 
-        <div id="summaryView" class="view-transition hidden-grid">
-            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-6 font-bold">Category Totals</h3>
-            <ul id="summaryList" class="space-y-4"></ul>
+        <div id="summaryView" class="hidden-grid">
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-6 font-bold">Category Distribution</h3>
+            <ul id="summaryList" class="space-y-8"></ul>
         </div>
 
         <div class="mt-20 flex justify-between items-center opacity-20">
@@ -77,19 +78,13 @@
             } else {
                 e.target.value = '';
                 categoryGrid.classList.add('hidden-grid');
-                currentEditCat = null;
             }
         });
 
         function renderCategories() {
             const sortedCats = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
             categoryGrid.innerHTML = sortedCats.map(c => `
-                <button 
-                    onclick="saveTransaction('${c}')" 
-                    oncontextmenu="handleLongPress(event, '${c}')"
-                    ontouchstart="startTimer(event, '${c}')"
-                    ontouchend="clearTimer()"
-                    class="category-chip py-4 rounded-xl text-[10px] font-bold uppercase bg-zinc-900/30 text-zinc-500 ${c === currentEditCat ? 'active-edit' : ''}">
+                <button onclick="saveTransaction('${c}')" class="category-chip py-4 rounded-xl text-[10px] font-bold uppercase bg-zinc-900/30 text-zinc-500 ${c === currentEditCat ? 'active-edit' : ''}">
                     ${c}
                 </button>
             `).join('');
@@ -98,15 +93,11 @@
         function saveTransaction(cat) {
             const rawValue = amountInput.value.replace(/\s+/g, '');
             if(!rawValue) return;
-
             expenses.push({ 
-                category: cat, 
-                amount: parseFloat(rawValue), 
+                category: cat, amount: parseFloat(rawValue), 
                 date: new Date().toLocaleDateString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) 
             });
-
             categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
-            
             amountInput.value = '';
             currentEditCat = null;
             categoryGrid.classList.add('hidden-grid');
@@ -115,108 +106,83 @@
 
         function toggleView() {
             isSummaryMode = !isSummaryMode;
-            const actView = document.getElementById('activityView');
-            const sumView = document.getElementById('summaryView');
-            const viewBtn = document.getElementById('viewBtn');
-
-            if(isSummaryMode) {
-                actView.classList.add('hidden-grid');
-                sumView.classList.remove('hidden-grid');
-                viewBtn.innerText = "Activity";
-                renderSummary();
-            } else {
-                actView.classList.remove('hidden-grid');
-                sumView.classList.add('hidden-grid');
-                viewBtn.innerText = "Summary";
-            }
+            document.getElementById('inputSection').classList.toggle('hidden-grid', isSummaryMode);
+            document.getElementById('activityView').classList.toggle('hidden-grid', isSummaryMode);
+            document.getElementById('summaryView').classList.toggle('hidden-grid', !isSummaryMode);
+            document.getElementById('viewBtn').innerText = isSummaryMode ? "Activity" : "Summary";
+            document.getElementById('headerLabel').innerText = isSummaryMode ? "Total Overview" : "Total Spent";
+            if(isSummaryMode) renderSummary();
         }
 
         function renderSummary() {
-            const summaryList = document.getElementById('summaryList');
+            const list = document.getElementById('summaryList');
             const totals = {};
+            let grandTotal = 0;
             
             expenses.forEach(e => {
                 totals[e.category] = (totals[e.category] || 0) + e.amount;
+                grandTotal += e.amount;
             });
 
-            const sortedTotals = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+            const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
 
-            summaryList.innerHTML = sortedTotals.map(([cat, amt]) => `
-                <li class="flex justify-between items-center bg-zinc-900/30 p-4 rounded-2xl border border-zinc-900">
-                    <span class="text-sm font-bold text-zinc-400 uppercase tracking-tight">${cat}</span>
-                    <span class="text-sm font-black tabular-nums text-zinc-200">${Number(amt).toLocaleString('hu-HU')} Ft</span>
-                </li>
-            `).join('');
+            list.innerHTML = sorted.map(([cat, amt]) => {
+                const percent = grandTotal > 0 ? (amt / grandTotal * 100).toFixed(0) : 0;
+                return `
+                <li>
+                    <div class="flex justify-between items-end mb-1">
+                        <span class="text-xs font-bold text-zinc-400 uppercase tracking-tighter">${cat}</span>
+                        <div class="text-right">
+                            <span class="text-[10px] text-zinc-600 font-bold mr-2">${percent}%</span>
+                            <span class="text-sm font-black text-zinc-200 tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 0%" data-w="${percent}"></div></div>
+                </li>`;
+            }).join('');
+
+            // Animate bars
+            setTimeout(() => {
+                document.querySelectorAll('.progress-fill').forEach(el => el.style.width = el.dataset.w + '%');
+            }, 50);
         }
 
-        function editEntry(index) {
-            const item = expenses[index];
-            currentEditCat = item.category;
-            amountInput.value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
-            expenses.splice(index, 1);
-            
+        function renderAll() {
+            const list = document.getElementById('expenseList');
+            list.innerHTML = [...expenses].reverse().map((e, i) => {
+                const idx = expenses.length - 1 - i;
+                return `
+                <li class="flex justify-between items-center">
+                    <button onclick="editEntry(${idx})" class="flex flex-col text-left">
+                        <span class="text-sm font-semibold text-zinc-400 underline decoration-zinc-900 underline-offset-4">${e.category}</span>
+                        <span class="text-[9px] text-zinc-700 font-bold uppercase">${e.date}</span>
+                    </button>
+                    <div class="flex items-center gap-4">
+                        <span class="font-bold text-sm text-zinc-500 tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
+                        <button onclick="deleteEntry(${idx})" class="text-zinc-900 text-xl px-2">×</button>
+                    </div>
+                </li>`;
+            }).join('');
+            const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+            document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+            localStorage.setItem('categories', JSON.stringify(categories));
+            localStorage.setItem('categoryUsage', JSON.stringify(categoryUsage));
+        }
+
+        function editEntry(i) {
+            currentEditCat = expenses[i].category;
+            amountInput.value = Number(expenses[i].amount).toLocaleString('hu-HU').replace(/,/g, ' ');
+            expenses.splice(i, 1);
             categoryGrid.classList.remove('hidden-grid');
             renderCategories();
             amountInput.focus();
             renderAll();
         }
 
-        function deleteEntry(index) {
-            if(confirm("Delete this entry?")) {
-                expenses.splice(index, 1);
-                renderAll();
-                if(isSummaryMode) renderSummary();
-            }
-        }
-
-        function addNewCategory() {
-            const name = prompt("New Category Name:");
-            if(name && !categories.includes(name)) {
-                categories.push(name);
-                if(amountInput.value > 0) renderCategories();
-            }
-        }
-
-        let pressTimer;
-        function startTimer(e, cat) {
-            pressTimer = window.setTimeout(() => {
-                if(confirm(`Delete category "${cat}"?`)) {
-                    categories = categories.filter(c => c !== cat);
-                    renderCategories();
-                }
-            }, 800);
-        }
-        function clearTimer() { clearTimeout(pressTimer); }
-        function handleLongPress(e, cat) { e.preventDefault(); }
-
-        function renderAll() {
-            const list = document.getElementById('expenseList');
-            const displayExpenses = [...expenses].reverse();
-            
-            list.innerHTML = displayExpenses.map((e, i) => {
-                const originalIndex = expenses.length - 1 - i;
-                return `
-                <li class="flex justify-between items-center">
-                    <button onclick="editEntry(${originalIndex})" class="flex flex-col text-left active:opacity-50 transition-opacity">
-                        <span class="text-sm font-semibold text-zinc-400 decoration-zinc-900 underline underline-offset-4">${e.category}</span>
-                        <span class="text-[9px] text-zinc-700 font-bold uppercase tracking-tighter">${e.date}</span>
-                    </button>
-                    <div class="flex items-center gap-4">
-                        <span class="font-bold text-sm text-zinc-500 tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
-                        <button onclick="deleteEntry(${originalIndex})" class="text-zinc-900 text-xl px-2">×</button>
-                    </div>
-                </li>
-            `}).join('');
-
-            const total = expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
-            document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
-
-            localStorage.setItem('expenses', JSON.stringify(expenses));
-            localStorage.setItem('categories', JSON.stringify(categories));
-            localStorage.setItem('categoryUsage', JSON.stringify(categoryUsage));
-        }
-
-        function clearAll() { if(confirm("Wipe all data?")) { expenses = []; renderAll(); if(isSummaryMode) renderSummary(); } }
+        function deleteEntry(i) { if(confirm("Delete entry?")) { expenses.splice(i, 1); renderAll(); } }
+        function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
+        function clearAll() { if(confirm("Wipe data?")) { expenses = []; renderAll(); } }
         function exportToCSV() {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${e.date}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });
@@ -224,7 +190,6 @@
             const a = document.createElement('a');
             a.href = url; a.download = `Spending.csv`; a.click();
         }
-
         renderAll();
     </script>
 </body>

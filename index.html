@@ -72,7 +72,10 @@
         const PALETTE = ['#1c1c1e', '#2c2c2e', '#3a3a3c', '#48484a', '#636366', '#8e8e93', '#c7c7cc', '#F8F8F2'];
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
         let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi'];
-        let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
+        // Ensure categoryUsage is an object
+        let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage'));
+        if (!categoryUsage || Array.isArray(categoryUsage)) { categoryUsage = {}; }
+
         let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
         let viewDate = new Date();
         let selectedTimestamp = new Date().setHours(12,0,0,0);
@@ -96,7 +99,7 @@
                 document.getElementById('categoryGrid').classList.remove('hidden-grid');
                 document.getElementById('dateSelector').classList.remove('hidden-grid');
                 renderDateScroller();
-                renderCategories();
+                renderCategories(); // Re-sort and render every time input is active
             } else {
                 resetInput();
             }
@@ -124,9 +127,9 @@
             }
             scroller.innerHTML = html;
             
-            // Handle Alignment
+            // Alignment Logic
             const selectedDay = new Date(selectedTimestamp).getDate();
-            const cardWidth = 68; // Card + gap
+            const cardWidth = 68; 
             const containerWidth = scroller.offsetWidth;
             
             if (selectedDay <= 3) {
@@ -144,7 +147,13 @@
         }
 
         function renderCategories() {
-            const sorted = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
+            // STRICT SORTING LOGIC: Higher usage comes first
+            const sorted = [...categories].sort((a, b) => {
+                const usageA = categoryUsage[a] || 0;
+                const usageB = categoryUsage[b] || 0;
+                return usageB - usageA; // Descending: Largest number first
+            });
+
             document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
                 const col = getColor(c);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
@@ -163,6 +172,7 @@
                 expenses.push({ category: cat, amount: parseFloat(raw), date: selectedTimestamp, color: getColor(cat) });
             }
             
+            // Increment usage immediately
             categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
             localStorage.setItem('categoryUsage', JSON.stringify(categoryUsage));
             
@@ -187,7 +197,7 @@
             document.getElementById('categoryGrid').classList.remove('hidden-grid');
             document.getElementById('dateSelector').classList.remove('hidden-grid');
             renderDateScroller();
-            renderCategories();
+            renderCategories(); // This will show sorted categories
             amountInput.focus();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -228,7 +238,7 @@
 
         function deleteEntry(i) { if(confirm("Delete?")) { expenses.splice(i, 1); renderAll(); } }
         function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
-        function clearAll() { if(confirm("Reset?")) { expenses = []; renderAll(); } }
+        function clearAll() { if(confirm("Reset?")) { expenses = []; renderAll(); categoryUsage = {}; localStorage.removeItem('categoryUsage'); } }
         
         function toggleView() {
             const isVis = document.getElementById('summaryView').classList.toggle('hidden-grid');

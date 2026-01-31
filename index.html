@@ -7,29 +7,46 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; height: 100vh; display: flex; flex-direction: column; }
+        body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
         /* Layout Utilities */
-        .app-container { flex: 1; display: flex; flex-direction: column; max-width: 28rem; margin: 0 auto; width: 100%; padding: 1.5rem; }
+        .app-container { flex: 1; display: flex; flex-direction: column; max-width: 28rem; margin: 0 auto; width: 100%; padding: 1.5rem; height: 100%; }
         
         /* Solid Stack */
         .stack-item { border-radius: 0; margin-bottom: 0; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .stack-item:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
         .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; border-bottom: none; }
         
-        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; min-height: 80px; }
+        /* Categories */
+        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; min-height: 80px; user-select: none; -webkit-user-select: none; }
         .active-edit { border-color: #FFFFFF !important; background: #333333 !important; }
         
         /* Visibility States */
         .hidden-grid { display: none !important; }
         .full-screen-mode .hide-on-input { display: none !important; }
-        .full-screen-mode #inputSection { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; }
-        .full-screen-mode #categoryGrid { overflow-y: auto; flex-grow: 1; align-content: start; padding-bottom: 20px; }
+        .full-screen-mode #inputSection { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; height: 100%; }
+        
+        /* SCROLLABLE GRID (4x3 View) */
+        .full-screen-mode #categoryGrid { 
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            /* Height for roughly 4 rows (80px height + gap) */
+            max-height: 360px; 
+            overflow-y: auto;
+            flex-grow: 0; /* Don't grow infinitely */
+            flex-shrink: 1; /* Allow shrinking if screen is small */
+            padding-bottom: 20px;
+            /* Hide Scrollbar */
+            scrollbar-width: none; 
+            -ms-overflow-style: none;
+        }
+        .full-screen-mode #categoryGrid::-webkit-scrollbar { display: none; }
         
         /* Scroller */
         .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
         .date-scroller::-webkit-scrollbar { display: none; }
-        .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; position: relative; }
+        .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; position: relative; user-select: none; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
         .today-dot { position: absolute; bottom: 6px; width: 4px; height: 4px; background: currentColor; border-radius: 50%; opacity: 0.5; }
         
@@ -56,20 +73,20 @@
             </div>
         </div>
 
-        <div id="inputSection" class="mb-12 relative">
-            <div id="editHeader" class="flex justify-between items-center mb-2">
+        <div id="inputSection" class="mb-12 relative flex flex-col">
+            <div id="editHeader" class="flex justify-between items-center mb-2 shrink-0">
                 <span class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Amount</span>
                 <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
             </div>
             
             <input id="amount" type="text" inputmode="decimal" placeholder="0" 
-                class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-6 text-white">
+                class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-6 text-white shrink-0">
             
-            <div id="dateLocationTop"></div>
+            <div id="dateLocationTop" class="shrink-0"></div>
 
-            <div id="categoryGrid" class="grid grid-cols-3 gap-2 hidden-grid mb-4"></div>
+            <div id="categoryGrid" class="hidden-grid mb-4"></div>
 
-            <div id="dateLocationBottom" class="mt-auto"></div>
+            <div id="dateLocationBottom" class="mt-auto shrink-0 pb-4"></div>
         </div>
 
         <div id="dateSelector" class="hidden-grid">
@@ -77,7 +94,7 @@
             <div id="scroller" class="date-scroller mb-2"></div>
         </div>
 
-        <div id="contentArea" class="hide-on-input flex-1">
+        <div id="contentArea" class="hide-on-input flex-1 overflow-y-auto">
             <div id="activityView">
                 <ul id="expenseList" class="flex flex-col"></ul>
             </div>
@@ -86,7 +103,7 @@
             </div>
         </div>
 
-        <div id="footerArea" class="mt-10 flex justify-between items-center opacity-10 hide-on-input">
+        <div id="footerArea" class="mt-4 flex justify-between items-center opacity-10 hide-on-input shrink-0">
             <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest">CSV</button>
             <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest text-red-900">Reset</button>
         </div>
@@ -95,7 +112,7 @@
     <script>
         const PALETTE = ['#1c1c1e', '#2c2c2e', '#3a3a3c', '#48484a', '#636366', '#8e8e93', '#c7c7cc', '#F8F8F2'];
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
-        let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi'];
+        let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi', 'Gym', 'Coffee', 'Transport', 'Savings', 'Gifts', 'Pets'];
         let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
         if (Array.isArray(categoryUsage)) categoryUsage = {};
 
@@ -104,6 +121,7 @@
         let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditIdx = null;
         let isSummaryMode = false;
+        let longPressTimer; // Timer for deletion
 
         function getColor(cat) {
             if (!categoryColors[cat]) {
@@ -122,13 +140,9 @@
             if (val.length > 0) {
                 e.target.value = Number(val).toLocaleString('hu-HU').replace(/,/g, ' ');
                 
-                // TRIGGER FULL SCREEN MODE
                 document.body.classList.add('full-screen-mode');
-                
-                // Show grid
                 document.getElementById('categoryGrid').classList.remove('hidden-grid');
                 
-                // NEW ENTRY: Date at Bottom
                 if (currentEditIdx === null) {
                     document.getElementById('dateLocationBottom').appendChild(dateSelector);
                 }
@@ -140,6 +154,45 @@
                 if (currentEditIdx === null) resetInput();
             }
         });
+
+        // LONG PRESS LOGIC
+        function startLongPress(cat) {
+            longPressTimer = setTimeout(() => {
+                if(confirm(`Delete category "${cat}" permanently?`)) {
+                    categories = categories.filter(c => c !== cat);
+                    renderCategories();
+                }
+            }, 800);
+        }
+
+        function cancelLongPress() {
+            clearTimeout(longPressTimer);
+        }
+
+        function renderCategories() {
+            const sorted = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
+
+            document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
+                const col = getColor(c);
+                const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
+                const isEdit = currentEditIdx !== null && expenses[currentEditIdx].category === c;
+                
+                // Add touch/mouse listeners for long press
+                return `
+                <button 
+                    onmousedown="startLongPress('${c}')" 
+                    onmouseup="cancelLongPress()" 
+                    onmouseleave="cancelLongPress()"
+                    ontouchstart="startLongPress('${c}')" 
+                    ontouchend="cancelLongPress()" 
+                    ontouchmove="cancelLongPress()"
+                    onclick="saveTransaction('${c}')" 
+                    style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" 
+                    class="category-chip rounded-xl text-[11px] font-black uppercase ${isEdit ? 'active-edit' : ''}">
+                    ${c}
+                </button>`;
+            }).join('');
+        }
 
         function renderDateScroller() {
             const today = new Date().setHours(12,0,0,0);
@@ -163,11 +216,9 @@
             }
             scroller.innerHTML = html;
             
-            // Align
             const selectedDay = new Date(selectedTimestamp).getDate();
             const cardWidth = 68; 
             const containerWidth = scroller.offsetWidth;
-            
             if (selectedDay <= 3) scroller.scrollLeft = 0;
             else if (selectedDay >= daysInMonth - 2) scroller.scrollLeft = scroller.scrollWidth;
             else scroller.scrollLeft = (selectedDay * cardWidth) - (containerWidth / 2) - (cardWidth / 2);
@@ -176,18 +227,6 @@
         function selectDate(ts) {
             selectedTimestamp = ts;
             renderDateScroller();
-        }
-
-        function renderCategories() {
-            // Sort Descending Usage
-            const sorted = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
-
-            document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
-                const col = getColor(c);
-                const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
-                const isEdit = currentEditIdx !== null && expenses[currentEditIdx].category === c;
-                return `<button onclick="saveTransaction('${c}')" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" class="category-chip rounded-xl text-[11px] font-black uppercase ${isEdit ? 'active-edit' : ''}">${c}</button>`;
-            }).join('');
         }
 
         function saveTransaction(cat) {
@@ -222,12 +261,8 @@
             selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
             amountInput.value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
             
-            // TRIGGER FULL SCREEN
             document.body.classList.add('full-screen-mode');
-
-            // EDIT MODE: Move Date to Top (Under Input)
             document.getElementById('dateLocationTop').appendChild(dateSelector);
-            
             document.getElementById('categoryGrid').classList.remove('hidden-grid');
             dateSelector.classList.remove('hidden-grid');
             
@@ -242,7 +277,6 @@
 
         function toggleView() {
             isSummaryMode = !isSummaryMode;
-            // Force redraw of summary when toggling to it
             if(isSummaryMode) {
                 document.getElementById('inputSection').classList.add('hidden-grid');
                 document.getElementById('activityView').classList.add('hidden-grid');

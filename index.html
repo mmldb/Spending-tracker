@@ -7,16 +7,24 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; }
+        body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; height: 100vh; display: flex; flex-direction: column; }
+        
+        /* Layout Utilities */
+        .app-container { flex: 1; display: flex; flex-direction: column; max-width: 28rem; margin: 0 auto; width: 100%; padding: 1.5rem; }
         
         /* Solid Stack */
         .stack-item { border-radius: 0; margin-bottom: 0; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .stack-item:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
         .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; border-bottom: none; }
         
-        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; }
+        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; min-height: 80px; }
         .active-edit { border-color: #FFFFFF !important; background: #333333 !important; }
+        
+        /* Visibility States */
         .hidden-grid { display: none !important; }
+        .full-screen-mode .hide-on-input { display: none !important; }
+        .full-screen-mode #inputSection { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; }
+        .full-screen-mode #categoryGrid { overflow-y: auto; flex-grow: 1; align-content: start; padding-bottom: 20px; }
         
         /* Scroller */
         .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
@@ -32,21 +40,23 @@
         input::placeholder { color: #27272a; }
     </style>
 </head>
-<body class="p-6">
-    <div class="max-w-md mx-auto">
+<body class="font-sans">
+    <div class="app-container">
         
-        <div class="flex justify-between items-center mb-2 px-1">
-            <button onclick="changeMonth(-1)" class="text-zinc-600 text-xl font-black p-2"><<<</button>
-            <span onclick="jumpToToday()" id="currentMonthLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer">JANUARY 2026</span>
-            <button onclick="changeMonth(1)" class="text-zinc-600 text-xl font-black p-2">>>></button>
+        <div id="mainHeader" class="hide-on-input">
+            <div class="flex justify-between items-center mb-2 px-1">
+                <button onclick="changeMonth(-1)" class="text-zinc-600 text-xl font-black p-2"><<<</button>
+                <span onclick="jumpToToday()" id="currentMonthLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer">JANUARY 2026</span>
+                <button onclick="changeMonth(1)" class="text-zinc-600 text-xl font-black p-2">>>></button>
+            </div>
+
+            <div class="flex justify-between items-start mb-10 px-1">
+                <h2 id="totalDisplay" class="text-4xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
+                <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-800">Summary</button>
+            </div>
         </div>
 
-        <div class="flex justify-between items-start mb-10 px-1">
-            <h2 id="totalDisplay" class="text-4xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
-            <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-800">Summary</button>
-        </div>
-
-        <div id="inputSection" class="mb-12">
+        <div id="inputSection" class="mb-12 relative">
             <div id="editHeader" class="flex justify-between items-center mb-2">
                 <span class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Amount</span>
                 <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
@@ -57,25 +67,26 @@
             
             <div id="dateLocationTop"></div>
 
-            <div id="categoryGrid" class="grid grid-cols-3 gap-1 hidden-grid mb-6"></div>
+            <div id="categoryGrid" class="grid grid-cols-3 gap-2 hidden-grid mb-4"></div>
 
-            <div id="dateLocationBottom"></div>
+            <div id="dateLocationBottom" class="mt-auto"></div>
         </div>
 
         <div id="dateSelector" class="hidden-grid">
             <span class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-2">Select Date</span>
-            <div id="scroller" class="date-scroller mb-6"></div>
+            <div id="scroller" class="date-scroller mb-2"></div>
         </div>
 
-        <div id="activityView">
-            <ul id="expenseList" class="flex flex-col"></ul>
+        <div id="contentArea" class="hide-on-input flex-1">
+            <div id="activityView">
+                <ul id="expenseList" class="flex flex-col"></ul>
+            </div>
+            <div id="summaryView" class="hidden-grid">
+                <ul id="summaryList" class="space-y-6"></ul>
+            </div>
         </div>
 
-        <div id="summaryView" class="hidden-grid">
-            <ul id="summaryList" class="space-y-6"></ul>
-        </div>
-
-        <div class="mt-24 flex justify-between items-center opacity-10">
+        <div id="footerArea" class="mt-10 flex justify-between items-center opacity-10 hide-on-input">
             <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest">CSV</button>
             <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest text-red-900">Reset</button>
         </div>
@@ -85,7 +96,6 @@
         const PALETTE = ['#1c1c1e', '#2c2c2e', '#3a3a3c', '#48484a', '#636366', '#8e8e93', '#c7c7cc', '#F8F8F2'];
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
         let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi'];
-        // Fix for potential null usage stats
         let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
         if (Array.isArray(categoryUsage)) categoryUsage = {};
 
@@ -112,10 +122,13 @@
             if (val.length > 0) {
                 e.target.value = Number(val).toLocaleString('hu-HU').replace(/,/g, ' ');
                 
+                // TRIGGER FULL SCREEN MODE
+                document.body.classList.add('full-screen-mode');
+                
                 // Show grid
                 document.getElementById('categoryGrid').classList.remove('hidden-grid');
                 
-                // NEW ENTRY MODE: Move Date to Bottom
+                // NEW ENTRY: Date at Bottom
                 if (currentEditIdx === null) {
                     document.getElementById('dateLocationBottom').appendChild(dateSelector);
                 }
@@ -173,7 +186,7 @@
                 const col = getColor(c);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
                 const isEdit = currentEditIdx !== null && expenses[currentEditIdx].category === c;
-                return `<button onclick="saveTransaction('${c}')" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" class="category-chip py-5 rounded-lg text-[11px] font-black uppercase ${isEdit ? 'active-edit' : ''}">${c}</button>`;
+                return `<button onclick="saveTransaction('${c}')" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" class="category-chip rounded-xl text-[11px] font-black uppercase ${isEdit ? 'active-edit' : ''}">${c}</button>`;
             }).join('');
         }
 
@@ -196,6 +209,7 @@
 
         function resetInput() {
             amountInput.value = '';
+            document.body.classList.remove('full-screen-mode');
             document.getElementById('categoryGrid').classList.add('hidden-grid');
             dateSelector.classList.add('hidden-grid');
             currentEditIdx = null;
@@ -208,6 +222,9 @@
             selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
             amountInput.value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
             
+            // TRIGGER FULL SCREEN
+            document.body.classList.add('full-screen-mode');
+
             // EDIT MODE: Move Date to Top (Under Input)
             document.getElementById('dateLocationTop').appendChild(dateSelector);
             
@@ -225,11 +242,19 @@
 
         function toggleView() {
             isSummaryMode = !isSummaryMode;
-            document.getElementById('inputSection').classList.toggle('hidden-grid', isSummaryMode);
-            document.getElementById('activityView').classList.toggle('hidden-grid', isSummaryMode);
-            document.getElementById('summaryView').classList.toggle('hidden-grid', !isSummaryMode);
-            document.getElementById('viewBtn').innerText = isSummaryMode ? "Activity" : "Summary";
-            if(isSummaryMode) renderSummary();
+            // Force redraw of summary when toggling to it
+            if(isSummaryMode) {
+                document.getElementById('inputSection').classList.add('hidden-grid');
+                document.getElementById('activityView').classList.add('hidden-grid');
+                document.getElementById('summaryView').classList.remove('hidden-grid');
+                document.getElementById('viewBtn').innerText = "Activity";
+                renderSummary();
+            } else {
+                document.getElementById('inputSection').classList.remove('hidden-grid');
+                document.getElementById('activityView').classList.remove('hidden-grid');
+                document.getElementById('summaryView').classList.add('hidden-grid');
+                document.getElementById('viewBtn').innerText = "Summary";
+            }
         }
 
         function renderAll() {

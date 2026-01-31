@@ -80,7 +80,9 @@
 
         <div id="inputSection" class="mb-12 relative flex flex-col">
             <div id="editHeader" class="flex justify-between items-center mb-2 shrink-0">
-                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Amount</span>
+                <span id="amountLabel" class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Amount</span>
+                <button id="cancelBtn" onclick="resetInput()" class="hidden text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white">Cancel</button>
+                
                 <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
             </div>
             <input id="amount" type="text" inputmode="decimal" placeholder="0" class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-6 text-white shrink-0">
@@ -141,12 +143,19 @@
         const amountInput = document.getElementById('amount');
         const scroller = document.getElementById('scroller');
         const dateSelector = document.getElementById('dateSelector');
+        const amountLabel = document.getElementById('amountLabel');
+        const cancelBtn = document.getElementById('cancelBtn');
 
         amountInput.addEventListener('input', (e) => {
             let val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
             if (val.length > 0) {
                 e.target.value = Number(val).toLocaleString('hu-HU').replace(/,/g, ' ');
+                
+                // ENTER FULL SCREEN / EDIT MODE
                 document.body.classList.add('full-screen-mode');
+                amountLabel.classList.add('hidden'); // Hide "Amount" label
+                cancelBtn.classList.remove('hidden'); // Show "Cancel" button
+                
                 syncSelectedDateToView();
                 document.getElementById('categoryGrid').classList.remove('hidden-grid');
                 if (currentEditIdx === null) document.getElementById('dateLocationBottom').appendChild(dateSelector);
@@ -229,7 +238,11 @@
 
         function resetInput() {
             amountInput.value = '';
+            // EXIT FULL SCREEN
             document.body.classList.remove('full-screen-mode');
+            amountLabel.classList.remove('hidden'); // Show Label
+            cancelBtn.classList.add('hidden'); // Hide Cancel
+            
             document.getElementById('categoryGrid').classList.add('hidden-grid');
             dateSelector.classList.add('hidden-grid');
             currentEditIdx = null;
@@ -249,7 +262,12 @@
             const item = expenses[idx];
             selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
             amountInput.value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
+            
+            // ACTIVATE FULL SCREEN & CANCEL BUTTON
             document.body.classList.add('full-screen-mode');
+            amountLabel.classList.add('hidden');
+            cancelBtn.classList.remove('hidden');
+
             document.getElementById('dateLocationTop').appendChild(dateSelector);
             document.getElementById('categoryGrid').classList.remove('hidden-grid');
             dateSelector.classList.remove('hidden-grid');
@@ -283,7 +301,6 @@
                 budgetLabel.innerText = "Set Budget";
             }
             
-            // Total Comparison Pill
             const { prevTotal } = getComparisonData();
             const pill = document.getElementById('comparisonPill');
             if (prevTotal > 0) {
@@ -431,7 +448,6 @@
             const height = svg.clientHeight || 150;
             const stepX = width / (daysInMonth - 1);
             
-            // Build Points
             let points = "";
             let areaPoints = `0,${height} `;
             

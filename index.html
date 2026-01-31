@@ -7,30 +7,31 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; }
-        
-        /* Solid Monochrome Stack */
+        body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; font-family: sans-serif; }
         .stack-item { border-radius: 0; margin-bottom: 0; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .stack-item:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
         .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; border-bottom: none; }
-        
         .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; }
         .active-edit { border-color: #FFFFFF !important; background: #27272a !important; }
         .hidden-grid { display: none !important; }
-        
-        /* Grayscale Summary Pillars */
         .progress-bar { height: 10px; border-radius: 5px; background: #1c1c1e; overflow: hidden; margin-top: 12px; }
         .progress-fill { height: 100%; transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
-        
         input::placeholder { color: #27272a; }
+        /* Hide default date input icon but keep functional */
+        .date-edit-input { background: transparent; color: transparent; border: none; width: 24px; cursor: pointer; position: absolute; right: 0; }
     </style>
 </head>
-<body class="p-6 font-sans">
+<body class="p-6">
     <div class="max-w-md mx-auto">
         
-        <div class="flex justify-between items-start mb-10">
-            <div class="flex flex-col text-left">
-                <span class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Portfolio Value</span>
+        <div class="flex justify-between items-center mb-2 px-1">
+            <button onclick="changeMonth(-1)" class="text-zinc-600 text-xl font-black p-2"><<<</button>
+            <span id="currentMonthLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">January 2026</span>
+            <button onclick="changeMonth(1)" class="text-zinc-600 text-xl font-black p-2">>>></button>
+        </div>
+
+        <div class="flex justify-between items-start mb-10 px-1">
+            <div class="flex flex-col">
                 <h2 id="totalDisplay" class="text-4xl font-black tabular-nums tracking-tighter text-white">0 Ft</h2>
             </div>
             <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-800">Summary</button>
@@ -38,12 +39,11 @@
 
         <div id="inputSection" class="mb-12">
             <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Enter Amount</span>
-                <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
+                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Add to <span id="addDateLabel">Today</span></span>
+                <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter">+ Category</button>
             </div>
             <input id="amount" type="text" inputmode="decimal" placeholder="0" 
                 class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-8 text-white">
-            
             <div id="categoryGrid" class="grid grid-cols-3 gap-1 hidden-grid"></div>
         </div>
 
@@ -64,13 +64,11 @@
     </div>
 
     <script>
-        // Monochrome Palette: Black, Grays, and White
         const PALETTE = ['#1c1c1e', '#2c2c2e', '#3a3a3c', '#48484a', '#636366', '#8e8e93', '#c7c7cc', '#F8F8F2'];
-        
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
         let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi'];
         let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
-        let currentEditCat = null;
+        let viewDate = new Date(); // Controls what month we are looking at
         let isSummaryMode = false;
 
         function getColor(cat) {
@@ -99,28 +97,79 @@
         function renderCategories() {
             categoryGrid.innerHTML = categories.map(c => {
                 const col = getColor(c);
-                const isLight = col === '#c7c7cc' || col === '#F8F8F2' || col === '#8e8e93';
-                return `
-                <button onclick="saveTransaction('${c}')" 
-                    style="background: ${col}; color: ${isLight ? '#000000' : '#FFFFFF'}"
-                    class="category-chip py-5 rounded-lg text-[11px] font-black uppercase ${c === currentEditCat ? 'active-edit' : ''}">
-                    ${c}
-                </button>`;
+                const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
+                return `<button onclick="saveTransaction('${c}')" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" class="category-chip py-5 rounded-lg text-[11px] font-black uppercase">${c}</button>`;
             }).join('');
         }
 
         function saveTransaction(cat) {
             const raw = amountInput.value.replace(/\s+/g, '');
             if(!raw) return;
+            // Use current viewDate month/year, but today's date if viewing current month
+            const now = new Date();
+            const timestamp = (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) ? now.getTime() : viewDate.getTime();
+            
             expenses.push({ 
-                category: cat, amount: parseFloat(raw), 
-                date: new Date().toLocaleDateString('hu-HU', { month: '2-digit', day: '2-digit' }),
+                category: cat, 
+                amount: parseFloat(raw), 
+                date: timestamp,
                 color: getColor(cat) 
             });
             amountInput.value = '';
-            currentEditCat = null;
             categoryGrid.classList.add('hidden-grid');
             renderAll();
+        }
+
+        function changeMonth(dir) {
+            viewDate.setMonth(viewDate.getMonth() + dir);
+            renderAll();
+            if(isSummaryMode) renderSummary();
+        }
+
+        function updateEntryDate(index, newDateStr) {
+            if(!newDateStr) return;
+            expenses[index].date = new Date(newDateStr).getTime();
+            renderAll();
+        }
+
+        function renderAll() {
+            const list = document.getElementById('expenseList');
+            const monthName = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            document.getElementById('currentMonthLabel').innerText = monthName;
+
+            // Filter expenses for current view month
+            const filtered = expenses.filter(e => {
+                const d = new Date(e.date);
+                return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
+            }).sort((a,b) => b.date - a.date);
+
+            list.innerHTML = filtered.map((e) => {
+                const origIdx = expenses.indexOf(e);
+                const col = getColor(e.category);
+                const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
+                const d = new Date(e.date);
+                return `
+                <li class="stack-item p-6 flex justify-between items-center relative" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
+                    <div class="flex flex-col text-left">
+                        <span class="text-sm font-black uppercase tracking-tight">${e.category}</span>
+                        <div class="flex items-center gap-1 opacity-40">
+                            <span class="text-[9px] font-bold uppercase">${d.toLocaleDateString('hu-HU')}</span>
+                            <div class="relative w-4 h-4 overflow-hidden">
+                                <span class="text-[10px]">🗓️</span>
+                                <input type="date" class="date-edit-input" onchange="updateEntryDate(${origIdx}, this.value)">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-black text-md tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
+                        <button onclick="deleteEntry(${origIdx})" class="text-2xl opacity-20 font-light px-2">×</button>
+                    </div>
+                </li>`;
+            }).join('');
+
+            const total = filtered.reduce((sum, e) => sum + e.amount, 0);
+            document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
+            localStorage.setItem('expenses', JSON.stringify(expenses));
         }
 
         function toggleView() {
@@ -136,20 +185,25 @@
             const list = document.getElementById('summaryList');
             const totals = {};
             let grand = 0;
-            expenses.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; grand += e.amount; });
+            const filtered = expenses.filter(e => {
+                const d = new Date(e.date);
+                return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
+            });
+            
+            filtered.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; grand += e.amount; });
             const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
 
             list.innerHTML = sorted.map(([cat, amt]) => {
                 const p = grand > 0 ? (amt / grand * 100).toFixed(0) : 0;
                 const col = getColor(cat);
-                const isLight = col === '#c7c7cc' || col === '#F8F8F2' || col === '#8e8e93';
+                const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
                 return `
                 <li>
-                    <div class="flex justify-between items-center p-5 rounded-2xl" style="background: ${col}; color: ${isLight ? '#000000' : '#FFFFFF'}">
+                    <div class="flex justify-between items-center p-5 rounded-2xl" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
                         <span class="text-sm font-black uppercase tracking-tight">${cat}</span>
-                        <div class="text-right">
-                            <span class="text-[10px] font-black opacity-40 mr-2">${p}%</span>
+                        <div class="text-right flex flex-col">
                             <span class="text-md font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
+                            <span class="text-[10px] font-black opacity-40">${p}%</span>
                         </div>
                     </div>
                     <div class="progress-bar"><div class="progress-fill" style="width: 0%; background:${col}" data-w="${p}"></div></div>
@@ -158,47 +212,14 @@
             setTimeout(() => { document.querySelectorAll('.progress-fill').forEach(el => el.style.width = el.dataset.w + '%'); }, 50);
         }
 
-        function renderAll() {
-            const list = document.getElementById('expenseList');
-            list.innerHTML = [...expenses].reverse().map((e, i) => {
-                const idx = expenses.length - 1 - i;
-                const col = getColor(e.category);
-                const isLight = col === '#c7c7cc' || col === '#F8F8F2' || col === '#8e8e93';
-                return `
-                <li class="stack-item p-6 flex justify-between items-center" style="background: ${col}; color: ${isLight ? '#000000' : '#FFFFFF'}">
-                    <button onclick="editEntry(${idx})" class="flex flex-col text-left">
-                        <span class="text-sm font-black uppercase tracking-tight">${e.category}</span>
-                        <span class="text-[9px] font-bold opacity-30 uppercase">${e.date}</span>
-                    </button>
-                    <div class="flex items-center gap-4">
-                        <span class="font-black text-md tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
-                        <button onclick="deleteEntry(${idx})" class="text-2xl opacity-20 font-light px-2">×</button>
-                    </div>
-                </li>`;
-            }).join('');
-            const total = expenses.reduce((sum, e) => sum + e.amount, 0);
-            document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
-            localStorage.setItem('expenses', JSON.stringify(expenses));
-        }
-
-        function editEntry(i) {
-            currentEditCat = expenses[i].category;
-            amountInput.value = Number(expenses[i].amount).toLocaleString('hu-HU').replace(/,/g, ' ');
-            expenses.splice(i, 1);
-            categoryGrid.classList.remove('hidden-grid');
-            renderCategories();
-            amountInput.focus();
-            renderAll();
-        }
-
         function deleteEntry(i) { if(confirm("Delete entry?")) { expenses.splice(i, 1); renderAll(); } }
         function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
         function clearAll() { if(confirm("Wipe all data?")) { expenses = []; renderAll(); } }
         function exportToCSV() {
-            let csv = "Date,Category,Amount\n" + expenses.map(e => `"${e.date}","${e.category}",${e.amount}`).join("\n");
+            let csv = "Date,Category,Amount\n" + expenses.map(e => `"${new Date(e.date).toLocaleDateString()}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `Stealth_Spend.csv`; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = `Stealth_Report.csv`; a.click();
         }
         renderAll();
     </script>

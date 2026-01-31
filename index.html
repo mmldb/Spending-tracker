@@ -7,28 +7,23 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* KILL THE BLUE OVERSCROLL */
-        html { background-color: #000000; }
+        /* NATURAL SCROLLING - NO FIXED HEIGHTS */
         body { 
             background-color: #000000; 
             color: #FFFFFF; 
             -webkit-tap-highlight-color: transparent; 
-            height: 100vh; 
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden;
-            overscroll-behavior-y: none; /* Prevents bounce */
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            /* Allow natural browser scroll/bounce */
         }
 
         .app-container { 
-            flex: 1; 
-            display: flex; 
-            flex-direction: column; 
             max-width: 28rem; 
             margin: 0 auto; 
-            width: 100%; 
             padding: 1.5rem; 
-            height: 100%; 
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
         
         /* Stack Items */
@@ -37,26 +32,36 @@
         .stack-item:last-child { border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; border-bottom: none; }
         
         /* Categories */
-        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; min-height: 45px; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; }
+        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; min-height: 45px; display: flex; align-items: center; justify-content: center; user-select: none; }
         .active-edit { border-color: #FFFFFF !important; background: #333333 !important; }
         
-        /* Layout Utils */
+        /* VISIBILITY UTILS */
         .hidden-grid { display: none !important; }
-        .full-screen-mode .hide-on-input { display: none !important; }
         
-        /* Input Mode */
-        .full-screen-mode #inputSection { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; height: 100%; }
-        .full-screen-mode #categoryGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; max-height: 350px; overflow-y: auto; flex-grow: 0; flex-shrink: 1; padding-bottom: 20px; scrollbar-width: none; }
-        .full-screen-mode #categoryGrid::-webkit-scrollbar { display: none; }
+        /* FULL SCREEN INPUT MODE */
+        /* When active, we lock the body and make input take over */
+        body.full-screen-mode { overflow: hidden; height: 100vh; position: fixed; width: 100%; }
+        .full-screen-mode .hide-on-input { display: none !important; }
+        .full-screen-mode #inputSection { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            z-index: 50; background: #000000; 
+            padding: 2rem; 
+            display: flex; flex-direction: column; 
+        }
+        .full-screen-mode #categoryGrid { 
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; 
+            max-height: 400px; overflow-y: auto; flex-grow: 1; 
+            margin-bottom: 20px; 
+        }
         
         /* Scroller */
-        .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+        .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; }
         .date-scroller::-webkit-scrollbar { display: none; }
-        .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; position: relative; user-select: none; }
+        .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; position: relative; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
         .today-dot { position: absolute; bottom: 6px; width: 4px; height: 4px; background: currentColor; border-radius: 50%; opacity: 0.5; }
         
-        /* Summary UI */
+        /* Metrics */
         .progress-bar { height: 10px; border-radius: 5px; background: #1c1c1e; overflow: hidden; margin-top: 12px; }
         .progress-fill { height: 100%; transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
         .waterline-container { height: 4px; width: 100%; background: #1c1c1e; border-radius: 2px; overflow: hidden; margin-top: 8px; position: relative; }
@@ -72,48 +77,51 @@
         .chart-line { fill: none; stroke: #fff; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; }
         .chart-area { fill: url(#gradient); opacity: 0.3; }
         
-        /* Pagination Dots */
-        .dots-container { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+        /* View Dots */
+        .dots-container { display: flex; gap: 6px; justify-content: center; margin-top: 10px; opacity: 0.5; }
         .dot { width: 6px; height: 6px; border-radius: 50%; background: #333; transition: all 0.3s; }
         .dot.active { background: #FFF; width: 12px; border-radius: 3px; }
 
         input::placeholder { color: #27272a; }
     </style>
 </head>
-<body class="font-sans">
+<body class="font-sans text-sm">
     <div class="app-container">
         
-        <div id="mainHeader" class="hide-on-input">
-            <div class="flex justify-between items-center mb-4 px-1">
-                <div class="flex items-center gap-4">
-                     <button onclick="changeMonth(-1)" class="text-zinc-600 text-xl font-black p-2"><<<</button>
-                     <span onclick="jumpToToday()" id="currentMonthLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer">JANUARY 2026</span>
-                     <button onclick="changeMonth(1)" class="text-zinc-600 text-xl font-black p-2">>>></button>
+        <div id="mainHeader" class="hide-on-input mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="changeMonth(-1)" class="text-zinc-600 text-xl font-black p-2"><<<</button>
+                <div class="flex flex-col items-center">
+                    <span onclick="jumpToToday()" id="currentMonthLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer">JANUARY 2026</span>
+                    <div class="dots-container">
+                        <div id="dot1" class="dot active"></div>
+                        <div id="dot2" class="dot"></div>
+                    </div>
                 </div>
-                <div class="dots-container">
-                    <div id="dot1" class="dot active"></div>
-                    <div id="dot2" class="dot"></div>
-                </div>
+                <button onclick="changeMonth(1)" class="text-zinc-600 text-xl font-black p-2">>>></button>
             </div>
 
-            <div class="mb-10 px-1 relative group">
-                <div class="flex items-baseline cursor-pointer" onclick="setBudget()">
+            <div class="px-1 cursor-pointer" onclick="setBudget()">
+                <div class="flex items-baseline">
                     <h2 id="totalDisplay" class="text-5xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
                 </div>
                 <div class="waterline-container"><div id="waterlineFill" class="waterline-fill"></div></div>
-                <div class="flex justify-between mt-1">
-                    <span id="budgetLabel" class="text-[9px] font-bold text-zinc-700 uppercase tracking-widest">Tap to set limit</span>
+                <div class="flex justify-between mt-2">
+                    <span id="budgetLabel" class="text-[9px] font-bold text-zinc-700 uppercase tracking-widest">Set limit</span>
                 </div>
             </div>
         </div>
 
-        <div id="inputSection" class="mb-12 relative flex flex-col">
-            <div id="editHeader" class="flex justify-between items-center mb-2 shrink-0">
-                <span id="amountLabel" class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Amount</span>
-                <button id="cancelBtn" onclick="resetInput()" class="hidden text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white">Cancel</button>
-                <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
+        <div id="inputSection" class="mb-12 relative flex flex-col shrink-0">
+            <div id="editHeader" class="flex justify-between items-center mb-2 shrink-0 hidden-grid">
+                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Amount</span>
+                <button id="cancelBtn" onclick="resetInput()" class="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white">Cancel</button>
             </div>
             
+            <div id="catBtnContainer" class="flex justify-end mb-2 hidden-grid">
+                <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
+            </div>
+
             <input id="amount" type="text" inputmode="decimal" placeholder="0" 
                 class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-6 text-white shrink-0 text-left">
             
@@ -127,13 +135,19 @@
             <div id="scroller" class="date-scroller mb-2"></div>
         </div>
 
-        <div id="contentArea" class="hide-on-input flex-1 overflow-y-auto">
-            <div id="activityView"><ul id="expenseList" class="flex flex-col"></ul></div>
+        <div id="contentArea" class="hide-on-input flex-1 pb-10">
+            
+            <div id="activityView">
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-800 mb-4 pl-1">Recent Activity</h3>
+                <ul id="expenseList" class="flex flex-col"></ul>
+            </div>
             
             <div id="summaryView" class="hidden-grid">
-                <ul id="summaryList" class="space-y-6 mb-10"></ul>
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-800 mb-4 pl-1">Summary Breakdown</h3>
+                <ul id="summaryList" class="space-y-6 mb-12"></ul>
+                
                 <div class="mb-4">
-                     <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-4">Trend</h3>
+                     <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-4">Spending Trend</h3>
                      <div id="chartContainer" class="w-full h-40 bg-[#1c1c1e] rounded-2xl p-4 relative overflow-hidden flex items-end">
                         <svg id="spendingChart" class="w-full h-full overflow-visible" preserveAspectRatio="none"></svg>
                      </div>
@@ -141,7 +155,7 @@
             </div>
         </div>
 
-        <div id="footerArea" class="mt-4 flex justify-between items-center opacity-10 hide-on-input shrink-0">
+        <div id="footerArea" class="mt-8 flex justify-between items-center opacity-20 hide-on-input">
             <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest">CSV</button>
             <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest text-red-900">Reset</button>
         </div>
@@ -172,18 +186,10 @@
         });
 
         function handleSwipe() {
-            // Prevent swipe if in input mode
-            if (document.body.classList.contains('full-screen-mode')) return;
-            
-            const threshold = 50;
-            if (touchStartX - touchEndX > threshold) {
-                // Swipe Left -> Summary
-                if (!isSummaryMode) toggleView();
-            }
-            if (touchEndX - touchStartX > threshold) {
-                // Swipe Right -> Activity
-                if (isSummaryMode) toggleView();
-            }
+            if (document.body.classList.contains('full-screen-mode')) return; // No swipe in input
+            const threshold = 60;
+            if (touchStartX - touchEndX > threshold) { if (!isSummaryMode) toggleView(); } // Left -> Summary
+            if (touchEndX - touchStartX > threshold) { if (isSummaryMode) toggleView(); } // Right -> Activity
         }
 
         function getColor(cat) {
@@ -197,16 +203,19 @@
         const amountInput = document.getElementById('amount');
         const scroller = document.getElementById('scroller');
         const dateSelector = document.getElementById('dateSelector');
-        const amountLabel = document.getElementById('amountLabel');
-        const cancelBtn = document.getElementById('cancelBtn');
+        const editHeader = document.getElementById('editHeader');
+        const catBtnContainer = document.getElementById('catBtnContainer');
 
         amountInput.addEventListener('input', (e) => {
             let val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
             if (val.length > 0) {
                 e.target.value = Number(val).toLocaleString('hu-HU').replace(/,/g, ' ');
+                
+                // ENTER FULL SCREEN INPUT MODE
                 document.body.classList.add('full-screen-mode');
-                amountLabel.classList.add('hidden'); 
-                cancelBtn.classList.remove('hidden'); 
+                editHeader.classList.remove('hidden-grid');
+                catBtnContainer.classList.remove('hidden-grid');
+                
                 syncSelectedDateToView();
                 document.getElementById('categoryGrid').classList.remove('hidden-grid');
                 if (currentEditIdx === null) document.getElementById('dateLocationBottom').appendChild(dateSelector);
@@ -289,9 +298,10 @@
 
         function resetInput() {
             amountInput.value = '';
+            // EXIT FULL SCREEN
             document.body.classList.remove('full-screen-mode');
-            amountLabel.classList.remove('hidden');
-            cancelBtn.classList.add('hidden');
+            editHeader.classList.add('hidden-grid');
+            catBtnContainer.classList.add('hidden-grid');
             document.getElementById('categoryGrid').classList.add('hidden-grid');
             dateSelector.classList.add('hidden-grid');
             currentEditIdx = null;
@@ -311,9 +321,11 @@
             const item = expenses[idx];
             selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
             amountInput.value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
+            
+            // Edit Mode Trigger
             document.body.classList.add('full-screen-mode');
-            amountLabel.classList.add('hidden');
-            cancelBtn.classList.remove('hidden');
+            editHeader.classList.remove('hidden-grid');
+            catBtnContainer.classList.remove('hidden-grid');
             document.getElementById('dateLocationTop').appendChild(dateSelector);
             document.getElementById('categoryGrid').classList.remove('hidden-grid');
             dateSelector.classList.remove('hidden-grid');
@@ -375,7 +387,6 @@
 
         function toggleView() {
             isSummaryMode = !isSummaryMode;
-            // Update dots
             document.getElementById('dot1').classList.toggle('active', !isSummaryMode);
             document.getElementById('dot2').classList.toggle('active', isSummaryMode);
             

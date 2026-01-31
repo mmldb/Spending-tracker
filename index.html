@@ -39,10 +39,11 @@
         .waterline-container { height: 4px; width: 100%; background: #1c1c1e; border-radius: 2px; overflow: hidden; margin-top: 8px; position: relative; }
         .waterline-fill { height: 100%; background: #333; width: 0%; transition: width 0.5s ease-out; }
         
-        .pill { font-size: 10px; font-weight: 900; padding: 4px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; margin-left: 8px; vertical-align: middle; }
-        .pill-good { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
-        .pill-bad { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-        .pill-neutral { background: #27272a; color: #71717a; }
+        /* Pills */
+        .pill { font-size: 9px; font-weight: 900; padding: 3px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; vertical-align: middle; }
+        .pill-good { background: rgba(34, 197, 94, 0.2); color: #4ade80; } /* Green */
+        .pill-bad { background: rgba(239, 68, 68, 0.2); color: #f87171; } /* Red */
+        .pill-neutral { background: rgba(255, 255, 255, 0.1); color: #a1a1aa; }
         
         input::placeholder { color: #27272a; }
     </style>
@@ -63,7 +64,7 @@
             <div class="mb-10 px-1 relative group">
                 <div class="flex items-baseline cursor-pointer" onclick="setBudget()">
                     <h2 id="totalDisplay" class="text-5xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
-                    <span id="comparisonPill" class="pill pill-neutral">--</span>
+                    <span id="comparisonPill" class="pill pill-neutral ml-2">--</span>
                 </div>
                 <div class="waterline-container"><div id="waterlineFill" class="waterline-fill"></div></div>
                 <div class="flex justify-between mt-1">
@@ -108,7 +109,7 @@
         let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
         let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 0;
         
-        let viewDate = new Date(); // Current View Month
+        let viewDate = new Date();
         let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditIdx = null;
         let isSummaryMode = false;
@@ -126,17 +127,12 @@
         const scroller = document.getElementById('scroller');
         const dateSelector = document.getElementById('dateSelector');
 
-        // Ensure selectedTimestamp aligns with viewDate when we start typing
         amountInput.addEventListener('input', (e) => {
             let val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
             if (val.length > 0) {
                 e.target.value = Number(val).toLocaleString('hu-HU').replace(/,/g, ' ');
                 document.body.classList.add('full-screen-mode');
-                
-                // --- FIX: Sync Date to View ---
                 syncSelectedDateToView();
-                // ------------------------------
-
                 document.getElementById('categoryGrid').classList.remove('hidden-grid');
                 if (currentEditIdx === null) document.getElementById('dateLocationBottom').appendChild(dateSelector);
                 dateSelector.classList.remove('hidden-grid');
@@ -147,7 +143,6 @@
             }
         });
 
-        // Helper: If we are viewing Dec 2025, default input should be Dec 2025
         function syncSelectedDateToView() {
             const currentSel = new Date(selectedTimestamp);
             if(currentSel.getMonth() !== viewDate.getMonth() || currentSel.getFullYear() !== viewDate.getFullYear()) {
@@ -223,12 +218,10 @@
             document.getElementById('categoryGrid').classList.add('hidden-grid');
             dateSelector.classList.add('hidden-grid');
             currentEditIdx = null;
-            // IMPORTANT: Reset timestamp logic for clean slate, but will sync to view on type
             selectedTimestamp = new Date().setHours(12,0,0,0);
         }
 
         function editItem(idx) {
-            // Find corrected index from filtered view
             const filtered = expenses
                 .map((e, i) => ({...e, originalIndex: i}))
                 .filter(e => {
@@ -237,7 +230,6 @@
                 })
                 .sort((a, b) => { if (b.date !== a.date) return b.date - a.date; return b.originalIndex - a.originalIndex; });
             
-            // Note: In renderAll we pass e.originalIndex, so 'idx' is correct
             currentEditIdx = idx;
             const item = expenses[idx];
             selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
@@ -277,20 +269,26 @@
                 budgetLabel.innerText = "Set Budget";
             }
 
-            // Comparison Pill (MTD)
-            // Use today's day number. If today is Jan 15, we compare vs PrevMonth 1st-15th.
-            const todayDay = new Date().getDate(); 
-            // Handle edge case: if we are viewing a past month (e.g. Dec), do we compare to Nov?
-            // Yes, let's compare ViewMonth vs PreviousMonth (up to same day count)
-            // But if ViewMonth is FULL (past), we should compare to full PrevMonth?
-            // Let's stick to strict MTD logic based on ViewDate.
+            // Total Comparison
+            const { prevTotal } = getComparisonData();
+            const pill = document.getElementById('comparisonPill');
             
-            // Logic: Compare ViewMonth (up to today's day count if it's current month, or full if past?)
-            // Simplest effective logic: Compare ViewMonth Total vs PrevMonth Total (Same Day Count)
-            
+            if (prevTotal > 0) {
+                const diff = currentTotal - prevTotal;
+                const percentDiff = ((diff / prevTotal) * 100).toFixed(0);
+                if (diff < 0) { pill.className = "pill pill-good ml-2"; pill.innerText = `↓ ${Math.abs(percentDiff)}%`; } 
+                else if (diff > 0) { pill.className = "pill pill-bad ml-2"; pill.innerText = `↑ ${Math.abs(percentDiff)}%`; } 
+                else { pill.className = "pill pill-neutral ml-2"; pill.innerText = "= 0%"; }
+            } else {
+                pill.className = "pill pill-neutral ml-2"; pill.innerText = "--";
+            }
+        }
+
+        function getComparisonData() {
+            // Determine range
             let compareDayLimit = 31;
             const now = new Date();
-            // If viewing current month, limit to today. If viewing past, limit to full month (31).
+            // If viewing current month, limit to today. Else full month.
             if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) {
                 compareDayLimit = now.getDate();
             }
@@ -299,22 +297,13 @@
             let prevYear = viewDate.getFullYear();
             if (prevMonthIdx < 0) { prevMonthIdx = 11; prevYear -= 1; }
 
-            const prevMonthTotal = expenses.filter(e => {
+            const prevExpenses = expenses.filter(e => {
                 const d = new Date(e.date);
                 return d.getMonth() === prevMonthIdx && d.getFullYear() === prevYear && d.getDate() <= compareDayLimit;
-            }).reduce((sum, e) => sum + e.amount, 0);
-
-            const pill = document.getElementById('comparisonPill');
+            });
             
-            if (prevMonthTotal > 0) {
-                const diff = currentTotal - prevMonthTotal;
-                const percentDiff = ((diff / prevMonthTotal) * 100).toFixed(0);
-                if (diff < 0) { pill.className = "pill pill-good"; pill.innerText = `↓ ${Math.abs(percentDiff)}%`; } 
-                else if (diff > 0) { pill.className = "pill pill-bad"; pill.innerText = `↑ ${Math.abs(percentDiff)}%`; } 
-                else { pill.className = "pill pill-neutral"; pill.innerText = "= 0%"; }
-            } else {
-                pill.className = "pill pill-neutral"; pill.innerText = "--";
-            }
+            const prevTotal = prevExpenses.reduce((sum, e) => sum + e.amount, 0);
+            return { prevTotal, prevExpenses };
         }
 
         function changeMonth(dir) { 
@@ -381,12 +370,42 @@
                 return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
             });
             filtered.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; grand += e.amount; });
+            
+            // Get Previous Month Data for Categories
+            const { prevExpenses } = getComparisonData();
+            const prevTotals = {};
+            prevExpenses.forEach(e => { prevTotals[e.category] = (prevTotals[e.category] || 0) + e.amount; });
+
             const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+            
             list.innerHTML = sorted.map(([cat, amt]) => {
                 const p = grand > 0 ? (amt / grand * 100).toFixed(0) : 0;
                 const col = getColor(cat);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
-                return `<li><div class="flex justify-between items-center p-5 rounded-2xl" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}"><span class="text-sm font-black uppercase tracking-tight">${cat}</span><span class="text-md font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span></div><div class="progress-bar"><div class="progress-fill" style="width: 0%; background:${col}" data-w="${p}"></div></div></li>`;
+                
+                // Calculate Pill
+                const prevAmt = prevTotals[cat] || 0;
+                let pillHTML = "";
+                if (prevAmt > 0) {
+                    const diff = amt - prevAmt;
+                    const percent = ((diff / prevAmt) * 100).toFixed(0);
+                    if (diff < 0) pillHTML = `<span class="pill pill-good ml-2">↓ ${Math.abs(percent)}%</span>`;
+                    else if (diff > 0) pillHTML = `<span class="pill pill-bad ml-2">↑ ${Math.abs(percent)}%</span>`;
+                    else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
+                } else if (amt > 0) {
+                     pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`;
+                }
+
+                return `<li>
+                    <div class="flex justify-between items-center p-5 rounded-2xl" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
+                        <div class="flex items-center">
+                            <span class="text-sm font-black uppercase tracking-tight">${cat}</span>
+                            ${pillHTML}
+                        </div>
+                        <span class="text-md font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
+                    </div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 0%; background:${col}" data-w="${p}"></div></div>
+                </li>`;
             }).join('');
             setTimeout(() => { document.querySelectorAll('.progress-fill').forEach(el => el.style.width = el.dataset.w + '%'); }, 50);
         }

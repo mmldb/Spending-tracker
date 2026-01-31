@@ -8,16 +8,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; }
-        .stack-item { border-radius: 0; margin-bottom: 0; border: none; border-bottom: 1px solid rgba(0,0,0,0.1); transition: all 0.2s; }
+        .stack-item { border-radius: 0; margin-bottom: 0; border: none; border-bottom: 1px solid rgba(0,0,0,0.1); }
         .stack-item:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
         .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; border-bottom: none; }
         .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; }
-        .active-edit { border-color: #FFFFFF !important; background: #333333 !important; transform: scale(1.05); }
+        .active-edit { border-color: #FFFFFF !important; background: #333333 !important; }
         .hidden-grid { display: none !important; }
-        .progress-bar { height: 10px; border-radius: 5px; background: #1c1c1e; overflow: hidden; margin-top: 12px; }
-        .progress-fill { height: 100%; transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
-        input::placeholder { color: #27272a; }
-        .date-edit-input { opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+        
+        /* iOS Style Date Scroller */
+        .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+        .date-scroller::-webkit-scrollbar { display: none; }
+        .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; }
+        .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
     </style>
 </head>
 <body class="p-6">
@@ -25,38 +27,43 @@
         
         <div class="flex justify-between items-center mb-2 px-1">
             <button onclick="changeMonth(-1)" class="text-zinc-600 text-xl font-black p-2"><<<</button>
-            <span onclick="jumpToToday()" id="currentMonthLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer hover:text-white">January 2026</span>
+            <span onclick="jumpToToday()" id="currentMonthLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer">JANUARY 2026</span>
             <button onclick="changeMonth(1)" class="text-zinc-600 text-xl font-black p-2">>>></button>
         </div>
 
-        <div class="flex justify-between items-start mb-10 px-1 text-left">
-            <h2 id="totalDisplay" class="text-4xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
+        <div class="flex justify-between items-start mb-10 px-1">
+            <h2 id="totalDisplay" class="text-4xl font-black tabular-nums tracking-tighter text-white">0 Ft</h2>
             <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-800">Summary</button>
         </div>
 
         <div id="inputSection" class="mb-12">
-            <div class="flex justify-between items-center mb-2">
+            <div id="editHeader" class="flex justify-between items-center mb-2">
                 <span class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Amount</span>
-                <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter hover:text-zinc-400">+ New Category</button>
+                <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter">+ Category</button>
             </div>
+            
             <input id="amount" type="text" inputmode="decimal" placeholder="0" 
-                class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-8 text-white">
+                class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-6 text-white">
+            
+            <div id="dateSelector" class="hidden-grid">
+                <span class="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Select Date</span>
+                <div id="scroller" class="date-scroller mb-6"></div>
+            </div>
+
             <div id="categoryGrid" class="grid grid-cols-3 gap-1 hidden-grid"></div>
         </div>
 
         <div id="activityView">
-            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-800 mb-4 ml-1">Recent Activity</h3>
             <ul id="expenseList" class="flex flex-col"></ul>
         </div>
 
         <div id="summaryView" class="hidden-grid">
-            <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-800 mb-6">Distribution</h3>
             <ul id="summaryList" class="space-y-6"></ul>
         </div>
 
         <div class="mt-24 flex justify-between items-center opacity-10">
             <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest">Export CSV</button>
-            <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest">Wipe Memory</button>
+            <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest">Reset</button>
         </div>
     </div>
 
@@ -66,7 +73,8 @@
         let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi'];
         let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
         let viewDate = new Date();
-        let currentEditIdx = null; // Track if we are editing an existing item
+        let selectedTimestamp = new Date().setHours(12,0,0,0);
+        let currentEditIdx = null;
 
         function getColor(cat) {
             if (!categoryColors[cat]) {
@@ -78,25 +86,46 @@
 
         const amountInput = document.getElementById('amount');
         const categoryGrid = document.getElementById('categoryGrid');
+        const dateSelector = document.getElementById('dateSelector');
 
         amountInput.addEventListener('input', (e) => {
             let val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
             if (val.length > 0) {
                 e.target.value = Number(val).toLocaleString('hu-HU').replace(/,/g, ' ');
                 categoryGrid.classList.remove('hidden-grid');
+                dateSelector.classList.remove('hidden-grid');
+                renderDateScroller();
                 renderCategories();
             } else {
-                e.target.value = '';
-                categoryGrid.classList.add('hidden-grid');
-                currentEditIdx = null;
+                resetInput();
             }
         });
+
+        function renderDateScroller() {
+            const scroller = document.getElementById('scroller');
+            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
+            let html = '';
+            
+            for(let i = 1; i <= daysInMonth; i++) {
+                const dateObj = new Date(viewDate.getFullYear(), viewDate.getMonth(), i);
+                const dayName = dateObj.toLocaleString('en-US', { weekday: 'short' });
+                const ts = dateObj.setHours(12,0,0,0);
+                const isSelected = ts === selectedTimestamp;
+                
+                html += `
+                    <div onclick="selectedTimestamp = ${ts}; renderDateScroller()" class="date-card ${isSelected ? 'selected' : ''}">
+                        <span class="text-[10px] font-bold uppercase">${dayName}</span>
+                        <span class="text-lg font-black">${i}</span>
+                    </div>
+                `;
+            }
+            scroller.innerHTML = html;
+        }
 
         function renderCategories() {
             categoryGrid.innerHTML = categories.map(c => {
                 const col = getColor(c);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
-                // Highlight if editing this category
                 const isEdit = currentEditIdx !== null && expenses[currentEditIdx].category === c;
                 return `<button onclick="saveTransaction('${c}')" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" class="category-chip py-5 rounded-lg text-[11px] font-black uppercase ${isEdit ? 'active-edit' : ''}">${c}</button>`;
             }).join('');
@@ -107,36 +136,36 @@
             if(!raw) return;
 
             if (currentEditIdx !== null) {
-                // Update existing
-                expenses[currentEditIdx].category = cat;
-                expenses[currentEditIdx].amount = parseFloat(raw);
+                expenses[currentEditIdx] = { ...expenses[currentEditIdx], category: cat, amount: parseFloat(raw), date: selectedTimestamp };
                 currentEditIdx = null;
             } else {
-                // Create new
-                const now = new Date();
-                const timestamp = (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) ? now.getTime() : viewDate.setHours(12,0,0,0);
-                expenses.push({ category: cat, amount: parseFloat(raw), date: timestamp, color: getColor(cat) });
+                expenses.push({ category: cat, amount: parseFloat(raw), date: selectedTimestamp, color: getColor(cat) });
             }
 
+            resetInput();
+            renderAll();
+        }
+
+        function resetInput() {
             amountInput.value = '';
             categoryGrid.classList.add('hidden-grid');
-            renderAll();
+            dateSelector.classList.add('hidden-grid');
+            currentEditIdx = null;
+            selectedTimestamp = new Date().setHours(12,0,0,0);
         }
 
         function editItem(idx) {
             currentEditIdx = idx;
             const item = expenses[idx];
+            selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
             amountInput.value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
+            
             categoryGrid.classList.remove('hidden-grid');
+            dateSelector.classList.remove('hidden-grid');
+            renderDateScroller();
             renderCategories();
             amountInput.focus();
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        function updateDate(idx, val) {
-            if(!val) return;
-            expenses[idx].date = new Date(val).getTime();
-            renderAll();
         }
 
         function changeMonth(dir) { viewDate.setMonth(viewDate.getMonth() + dir); renderAll(); }
@@ -155,20 +184,15 @@
                 const origIdx = expenses.indexOf(e);
                 const col = getColor(e.category);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
-                const d = new Date(e.date);
                 return `
-                <li class="stack-item p-6 flex justify-between items-center" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
+                <li onclick="editItem(${origIdx})" class="stack-item p-6 flex justify-between items-center" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
                     <div class="flex flex-col text-left">
-                        <button onclick="editItem(${origIdx})" class="text-sm font-black uppercase tracking-tight text-left">${e.category}</button>
-                        <div class="flex items-center gap-1 opacity-40 relative">
-                            <span class="text-[9px] font-bold uppercase">${d.toLocaleDateString('hu-HU')}</span>
-                            <span class="text-[10px]">🗓️</span>
-                            <input type="date" class="date-edit-input" onchange="updateDate(${origIdx}, this.value)">
-                        </div>
+                        <span class="text-sm font-black uppercase tracking-tight">${e.category}</span>
+                        <span class="text-[9px] font-bold opacity-40 uppercase">${new Date(e.date).toLocaleDateString('hu-HU')}</span>
                     </div>
                     <div class="flex items-center gap-4">
                         <span class="font-black text-md tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
-                        <button onclick="deleteEntry(${origIdx})" class="text-2xl opacity-20 font-light px-2">×</button>
+                        <button onclick="event.stopPropagation(); deleteEntry(${origIdx})" class="text-2xl opacity-20 font-light px-2">×</button>
                     </div>
                 </li>`;
             }).join('');
@@ -178,41 +202,17 @@
             localStorage.setItem('expenses', JSON.stringify(expenses));
         }
 
+        function deleteEntry(i) { if(confirm("Delete?")) { expenses.splice(i, 1); renderAll(); } }
+        function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
+        function clearAll() { if(confirm("Reset?")) { expenses = []; renderAll(); } }
+        
         function toggleView() {
             const isVis = document.getElementById('summaryView').classList.toggle('hidden-grid');
             document.getElementById('inputSection').classList.toggle('hidden-grid', !isVis);
             document.getElementById('activityView').classList.toggle('hidden-grid', !isVis);
             document.getElementById('viewBtn').innerText = !isVis ? "Activity" : "Summary";
-            if(!isVis) renderSummary();
         }
 
-        function renderSummary() {
-            const list = document.getElementById('summaryList');
-            const totals = {}; let grand = 0;
-            const filtered = expenses.filter(e => {
-                const d = new Date(e.date);
-                return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
-            });
-            filtered.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; grand += e.amount; });
-            const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-            list.innerHTML = sorted.map(([cat, amt]) => {
-                const p = grand > 0 ? (amt / grand * 100).toFixed(0) : 0;
-                const col = getColor(cat);
-                const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
-                return `<li>
-                    <div class="flex justify-between items-center p-5 rounded-2xl" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
-                        <span class="text-sm font-black uppercase tracking-tight">${cat}</span>
-                        <span class="text-md font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
-                    </div>
-                    <div class="progress-bar"><div class="progress-fill" style="width: 0%; background:${col}" data-w="${p}"></div></div>
-                </li>`;
-            }).join('');
-            setTimeout(() => { document.querySelectorAll('.progress-fill').forEach(el => el.style.width = el.dataset.w + '%'); }, 50);
-        }
-
-        function deleteEntry(i) { if(confirm("Delete?")) { expenses.splice(i, 1); renderAll(); } }
-        function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
-        function clearAll() { if(confirm("Reset all?")) { expenses = []; renderAll(); } }
         function exportToCSV() {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${new Date(e.date).toLocaleDateString()}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });

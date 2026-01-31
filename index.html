@@ -22,7 +22,7 @@
             transition: all 0.2s; 
             border: 1px solid #27272a; 
             font-weight: 800; 
-            min-height: 45px; /* Reduced Height */
+            min-height: 45px; 
             display: flex; 
             align-items: center; 
             justify-content: center;
@@ -40,7 +40,7 @@
         .full-screen-mode #categoryGrid { 
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 4px; /* TIGHT GAP */
+            gap: 4px;
             max-height: 300px; 
             overflow-y: auto;
             flex-grow: 0; 
@@ -260,6 +260,22 @@
         }
 
         function editItem(idx) {
+            // Find actual index in global expenses array
+            const filtered = expenses
+                .map((e, i) => ({...e, originalIndex: i}))
+                .filter(e => {
+                    const d = new Date(e.date);
+                    return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
+                })
+                .sort((a, b) => {
+                    if (b.date !== a.date) return b.date - a.date;
+                    return b.originalIndex - a.originalIndex;
+                });
+                
+            // The clicked item is from the filtered/sorted view. 
+            // We need the original index to edit the main array.
+            // Since we passed 'origIdx' in renderAll, 'idx' IS the original index.
+            
             currentEditIdx = idx;
             const item = expenses[idx];
             selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
@@ -299,24 +315,30 @@
             const list = document.getElementById('expenseList');
             document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-            const filtered = expenses.filter(e => {
-                const d = new Date(e.date);
-                return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
-            }).sort((a,b) => b.date - a.date);
+            // Sort: 1. By Date (Newest first) 2. By Insertion Order (Newest ID first)
+            const filtered = expenses
+                .map((e, i) => ({ ...e, originalIndex: i }))
+                .filter(e => {
+                    const d = new Date(e.date);
+                    return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
+                })
+                .sort((a, b) => {
+                    if (b.date !== a.date) return b.date - a.date;
+                    return b.originalIndex - a.originalIndex;
+                });
 
             list.innerHTML = filtered.map((e) => {
-                const origIdx = expenses.indexOf(e);
                 const col = getColor(e.category);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
                 return `
-                <li onclick="editItem(${origIdx})" class="stack-item p-6 flex justify-between items-center" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
+                <li onclick="editItem(${e.originalIndex})" class="stack-item p-6 flex justify-between items-center" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
                     <div class="flex flex-col text-left">
                         <span class="text-sm font-black uppercase tracking-tight">${e.category}</span>
                         <span class="text-[9px] font-bold opacity-40 uppercase">${new Date(e.date).toLocaleDateString('hu-HU')}</span>
                     </div>
                     <div class="flex items-center gap-4">
                         <span class="font-black text-md tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
-                        <button onclick="event.stopPropagation(); deleteEntry(${origIdx})" class="text-2xl opacity-20 font-light px-2">×</button>
+                        <button onclick="event.stopPropagation(); deleteEntry(${e.originalIndex})" class="text-2xl opacity-20 font-light px-2">×</button>
                     </div>
                 </li>`;
             }).join('');

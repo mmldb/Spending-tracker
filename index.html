@@ -9,159 +9,158 @@
     <style>
         /* BASE THEME */
         :root {
-            --bg-color: #050505;
-            --card-color: #B4F76D; /* Acid Green from Ref */
-            --text-on-card: #000000;
-            --text-on-bg: #FFFFFF;
-            --divider: #27272a;
+            --bg-color: #000000;
+            --hero-bg: #18181b; /* Low Key Zinc-900 */
+            --text-main: #FFFFFF;
+            --text-muted: #71717a;
         }
 
-        body { background-color: var(--bg-color); color: var(--text-on-bg); -webkit-tap-highlight-color: transparent; height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); -webkit-tap-highlight-color: transparent; height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         
         /* TYPOGRAPHY */
-        .font-hero { letter-spacing: -0.04em; line-height: 0.9; font-weight: 800; }
+        .font-hero { letter-spacing: -0.05em; line-height: 0.85; font-weight: 800; }
         .font-mono-nums { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 
-        /* HERO CARD (The Top Section) */
+        /* HERO SECTION (Low Key) */
         .hero-section {
-            background-color: var(--card-color);
-            color: var(--text-on-card);
+            background-color: var(--hero-bg);
+            color: var(--text-main);
             border-bottom-left-radius: 32px;
             border-bottom-right-radius: 32px;
             padding: 1.5rem;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             position: relative;
             z-index: 20;
+            /* Subtle separation from black bg */
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5); 
+            border-bottom: 1px solid #27272a;
         }
         
         /* EXPANDED INPUT MODE */
-        .input-mode .hero-section { height: 35vh; border-radius: 0 0 32px 32px; }
-        .input-mode .hide-on-input { opacity: 0; pointer-events: none; height: 0; margin: 0; }
+        .input-mode .hero-section { height: 40vh; border-radius: 0 0 32px 32px; }
+        .input-mode .hide-on-input { opacity: 0; pointer-events: none; height: 0; margin: 0; overflow: hidden; }
         
         /* INPUT FIELD */
         #amount {
             background: transparent;
             border: none;
             outline: none;
-            color: var(--text-on-card);
+            color: #FFFFFF;
             width: 100%;
             padding: 0;
             margin: 0;
-            font-size: 5rem;
-            font-weight: 900;
-            letter-spacing: -0.05em;
-            placeholder-color: rgba(0,0,0,0.2);
+            font-size: 5.5rem; /* Massive */
+            font-weight: 800;
+            letter-spacing: -0.06em;
+            caret-color: #B2FF00; /* Future Green Caret */
         }
-        #amount::placeholder { color: rgba(0,0,0,0.2); }
+        #amount::placeholder { color: #3f3f46; }
 
-        /* DATE SCROLLER (Integrated into Hero) */
-        .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; scrollbar-width: none; }
-        .date-scroller::-webkit-scrollbar { display: none; }
-        .date-card { 
-            flex: 0 0 45px; height: 55px; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            border-radius: 8px; border: 1px solid rgba(0,0,0,0.1); 
-            scroll-snap-align: center;
-        }
-        .date-card.selected { background: #000000; color: #FFFFFF; border-color: #000000; }
-
-        /* GRID LAYOUTS */
+        /* CATEGORY GRID (Vibrant) */
         .category-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr); /* 2 Columns for bigger buttons */
-            gap: 8px;
-            padding: 1rem;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            padding: 1.5rem;
             padding-bottom: 2rem;
             overflow-y: auto;
         }
         
         .cat-btn {
-            background: #1c1c1e;
-            color: #FFF;
-            border-radius: 16px;
-            height: 70px;
-            font-size: 14px;
-            font-weight: 700;
+            color: #000000; /* Text always black on bold colors */
+            border-radius: 20px;
+            height: 80px;
+            font-size: 15px;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.02em;
             display: flex;
             align-items: center;
-            justify-content: center; /* Centered Text */
-            transition: transform 0.1s;
+            justify-content: center;
+            transition: transform 0.1s, filter 0.2s;
+            border: none;
         }
-        .cat-btn:active { transform: scale(0.98); background: #333; }
+        .cat-btn:active { transform: scale(0.96); filter: brightness(0.9); }
 
         /* LIST LAYOUT (History) */
-        .history-list {
-            padding: 0 1.5rem;
-            overflow-y: auto;
-            flex: 1;
-        }
+        .history-list { padding: 0 1.5rem; overflow-y: auto; flex: 1; }
         .history-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 0;
-            border-bottom: 1px solid var(--divider);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 18px 0; border-bottom: 1px solid #27272a;
         }
         .history-item:last-child { border-bottom: none; }
 
-        /* GRAPH (Mini sparkline) */
-        .sparkline { fill: none; stroke: #000000; stroke-width: 2px; stroke-linecap: round; }
-        .sparkline-fill { fill: rgba(0,0,0,0.1); stroke: none; }
+        /* DATE SCROLLER */
+        .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scrollbar-width: none; }
+        .date-scroller::-webkit-scrollbar { display: none; }
+        .date-card { 
+            flex: 0 0 45px; height: 60px; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            border-radius: 12px; background: #27272a; color: #71717a;
+            border: 1px solid transparent; 
+        }
+        .date-card.selected { background: #FFFFFF; color: #000000; }
 
         /* UTILS */
         .hidden { display: none !important; }
         .pill { 
-            background: #000000; color: #FFFFFF; 
-            padding: 4px 10px; border-radius: 99px; 
-            font-size: 11px; font-weight: 800; 
+            background: #27272a; color: #a1a1aa; 
+            padding: 6px 14px; border-radius: 99px; 
+            font-size: 10px; font-weight: 800; letter-spacing: 0.05em;
         }
+        .pill.active { background: #FFFFFF; color: #000000; }
+        
+        /* SPARKLINE */
+        .sparkline-path { stroke: #52525b; stroke-width: 2; fill: none; }
     </style>
 </head>
 <body>
 
-    <div id="hero" class="hero-section h-[35vh]"> <div class="flex justify-between items-center hide-on-input transition-opacity duration-200">
-            <div class="flex items-center gap-2">
-                <button onclick="changeMonth(-1)" class="text-xl font-bold opacity-50 p-2">←</button>
-                <span onclick="jumpToToday()" id="currentMonthLabel" class="text-xs font-black uppercase tracking-widest cursor-pointer">JAN 2026</span>
-                <button onclick="changeMonth(1)" class="text-xl font-bold opacity-50 p-2">→</button>
+    <div id="hero" class="hero-section h-[35vh]"> 
+        
+        <div class="flex justify-between items-center hide-on-input transition-opacity duration-300">
+            <div class="flex items-center gap-4">
+                <button onclick="changeMonth(-1)" class="text-2xl text-zinc-500 hover:text-white transition-colors">←</button>
+                <div onclick="jumpToToday()" class="flex flex-col cursor-pointer">
+                    <span id="currentMonthLabel" class="text-xs font-black uppercase tracking-widest text-white leading-none">JAN</span>
+                    <span id="currentYearLabel" class="text-[10px] font-bold text-zinc-600 uppercase tracking-widest leading-none">2026</span>
+                </div>
+                <button onclick="changeMonth(1)" class="text-2xl text-zinc-500 hover:text-white transition-colors">→</button>
             </div>
             <button onclick="toggleView()" id="viewBtn" class="pill">SUMMARY</button>
         </div>
 
-        <div class="flex flex-col justify-end flex-1 pb-2">
+        <div class="flex flex-col justify-end flex-1 pb-1 relative">
             
-            <div class="flex justify-between items-end mb-1">
-                <span id="topLabel" class="text-xs font-bold opacity-60 uppercase tracking-widest">Total Spent</span>
-                <span id="comparisonPill" class="text-xs font-bold tabular-nums"></span>
+            <div class="flex justify-between items-end mb-2 px-1">
+                <span id="topLabel" class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Total Spent</span>
+                <span id="comparisonPill" class="text-[10px] font-bold text-zinc-400 tabular-nums"></span>
             </div>
 
-            <div class="relative">
-                <h1 id="totalDisplay" onclick="activateInput()" class="font-hero text-[14vw] leading-none cursor-pointer transition-opacity">0</h1>
+            <div class="relative group">
+                <h1 id="totalDisplay" onclick="activateInput()" class="font-hero text-[13vw] leading-none cursor-pointer text-white tracking-tighter">0</h1>
                 <input id="amount" type="text" inputmode="decimal" placeholder="0" class="hidden absolute inset-0">
             </div>
 
-            <div id="miniGraph" class="h-12 w-full mt-4 opacity-50 hide-on-input">
+            <div id="miniGraph" class="h-10 w-full mt-2 opacity-50 hide-on-input">
                 <svg id="sparklineSvg" class="w-full h-full" preserveAspectRatio="none"></svg>
             </div>
 
-            <div id="dateScrollerContainer" class="hidden mt-4">
-                <span class="text-[9px] font-bold opacity-50 uppercase tracking-widest block mb-2">Select Date</span>
+            <div id="dateScrollerContainer" class="hidden mt-6">
                 <div id="scroller" class="date-scroller"></div>
             </div>
         </div>
     </div>
 
-    <div id="contentArea" class="flex-1 flex flex-col bg-black relative">
+    <div id="contentArea" class="flex-1 flex flex-col relative">
         
         <div id="activityView" class="history-list">
-            <div class="sticky top-0 bg-black pt-6 pb-2 z-10 flex justify-between items-end border-b border-zinc-800 mb-2">
-                <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">Recent Activity</h3>
-                <button onclick="setBudget()" id="budgetStatus" class="text-[10px] font-bold text-zinc-600 uppercase">Set Budget</button>
+            <div class="sticky top-0 bg-black pt-6 pb-4 z-10 flex justify-between items-end border-b border-zinc-900 mb-2">
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-600">Recent Transactions</h3>
+                <button onclick="setBudget()" id="budgetStatus" class="text-[10px] font-bold text-zinc-700 uppercase hover:text-zinc-400">Set Budget</button>
             </div>
             <ul id="expenseList"></ul>
         </div>
@@ -170,36 +169,44 @@
             </div>
 
         <div id="summaryView" class="history-list hidden">
-            <div class="sticky top-0 bg-black pt-6 pb-2 z-10 border-b border-zinc-800 mb-2">
-                <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">Breakdown</h3>
+            <div class="sticky top-0 bg-black pt-6 pb-4 z-10 border-b border-zinc-900 mb-2">
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-600">Monthly Breakdown</h3>
             </div>
             <ul id="summaryList"></ul>
         </div>
 
-        <div id="footer" class="p-4 flex justify-between items-center opacity-30 mt-auto">
-            <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest text-zinc-500">Export CSV</button>
-            <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest text-red-900">Reset</button>
+        <div id="footer" class="p-6 flex justify-between items-center mt-auto border-t border-zinc-900">
+            <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest text-zinc-600">Export</button>
+            <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest text-zinc-800 hover:text-red-900">Reset</button>
         </div>
     </div>
 
     <script>
-        // CONFIG
-        const PALETTE = ['#B4F76D', '#D8B4FE', '#FFD467', '#6DF7EA', '#FF9F9F', '#FFFFFF'];
-        
-        // DATA
+        // --- NEW PALETTE FROM REFERENCE IMAGE ---
+        const SWISS_PALETTE = {
+            'Future Green': '#B2FF00', // Acid Green
+            'Sky': '#1AAEFC',          // Bright Blue
+            'Violet': '#8455EA',       // Deep Purple
+            'Yellow': '#F2C94C',       // Warning Yellow
+            'Orange': '#F2994A',       // Soft Orange
+            'Red': '#EB5757',          // Soft Red
+            'Light': '#E0E0E0',        // Off White
+            'Gray': '#98989D'          // Classic Gray
+        };
+        const COLOR_KEYS = Object.values(SWISS_PALETTE);
+
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
-        let categories = JSON.parse(localStorage.getItem('categories')) || ['Food', 'Transport', 'Rent', 'Tech', 'Health', 'Fun', 'Groceries', 'Services'];
+        let categories = JSON.parse(localStorage.getItem('categories')) || ['Groceries', 'Transport', 'Rent', 'Tech', 'Health', 'Coffee', 'Services', 'Fun'];
         let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
+        let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
         let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 0;
         
-        // STATE
         let viewDate = new Date();
         let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditIdx = null;
         let isInputMode = false;
         let isSummaryMode = false;
 
-        // ELEMENTS
         const els = {
             hero: document.getElementById('hero'),
             totalDisplay: document.getElementById('totalDisplay'),
@@ -215,81 +222,73 @@
             viewBtn: document.getElementById('viewBtn')
         };
 
-        // --- CORE FUNCTIONS ---
+        function init() { renderAll(); }
 
-        function init() {
-            renderAll();
-            renderCategories();
+        // --- COLOR LOGIC ---
+        function getCategoryColor(cat) {
+            if (!categoryColors[cat]) {
+                // Assign a color from palette based on existing count (cycle through)
+                const index = Object.keys(categoryColors).length % COLOR_KEYS.length;
+                categoryColors[cat] = COLOR_KEYS[index];
+                localStorage.setItem('categoryColors', JSON.stringify(categoryColors));
+            }
+            return categoryColors[cat];
         }
 
-        // --- INPUT LOGIC ---
-
+        // --- INPUT MODE ---
         function activateInput(editIdx = null) {
             isInputMode = true;
             currentEditIdx = editIdx;
             
-            // UI Transformation
             document.body.classList.add('input-mode');
-            els.hero.style.height = "45vh"; // Grow header
+            
+            // Hide Display, Show Input
             els.totalDisplay.classList.add('hidden');
             els.amount.classList.remove('hidden');
             els.amount.focus();
             
-            // Switch Bottom Content
+            // Swap Bottom Views
             els.activityView.classList.add('hidden');
             els.summaryView.classList.add('hidden');
             els.footer.classList.add('hidden');
             els.categoryView.classList.remove('hidden');
-            
-            // Show Date Scroller
             els.dateContainer.classList.remove('hidden');
-            
-            // Setup Input Value
+
+            renderCategories();
+            renderDateScroller();
+
             if (editIdx !== null) {
                 const item = expenses[editIdx];
                 els.amount.value = item.amount;
                 selectedTimestamp = item.date;
-                els.topLabel.innerText = "Editing Entry";
+                els.topLabel.innerText = "EDITING";
             } else {
                 els.amount.value = "";
                 syncDateToView();
-                els.topLabel.innerText = "Enter Amount";
+                els.topLabel.innerText = "ENTER AMOUNT";
             }
-            
-            renderDateScroller();
         }
 
         function closeInput() {
             isInputMode = false;
             currentEditIdx = null;
-            
             document.body.classList.remove('input-mode');
-            els.hero.style.height = "35vh";
             
             els.amount.classList.add('hidden');
             els.totalDisplay.classList.remove('hidden');
             
-            els.dateContainer.classList.add('hidden');
             els.categoryView.classList.add('hidden');
+            els.dateContainer.classList.add('hidden');
             els.footer.classList.remove('hidden');
+
+            if(isSummaryMode) els.summaryView.classList.remove('hidden');
+            else els.activityView.classList.remove('hidden');
             
-            if(isSummaryMode) {
-                els.summaryView.classList.remove('hidden');
-            } else {
-                els.activityView.classList.remove('hidden');
-            }
-            
-            els.topLabel.innerText = "Total Spent";
+            els.topLabel.innerText = "TOTAL SPENT";
             els.amount.value = "";
         }
 
-        // Listener for typing
-        els.amount.addEventListener('input', (e) => {
-            // Ensure numbers only
-            e.target.value = e.target.value.replace(/[^0-9.]/g, '');
-        });
-
-        // --- SAVING ---
+        els.amount.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^0-9.]/g, ''); });
 
         function saveTransaction(cat) {
             const val = parseFloat(els.amount.value);
@@ -301,7 +300,6 @@
                 expenses.push({ category: cat, amount: val, date: selectedTimestamp });
             }
 
-            // Update Usage for sorting
             categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
             localStorage.setItem('categoryUsage', JSON.stringify(categoryUsage));
             localStorage.setItem('expenses', JSON.stringify(expenses));
@@ -311,205 +309,153 @@
         }
 
         // --- RENDERING ---
-
         function renderAll() {
-            // Update Header Date
-            document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+            document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'short' });
+            document.getElementById('currentYearLabel').innerText = viewDate.getFullYear();
 
-            // Filter Data
-            const monthExpenses = expenses.filter(e => {
+            const monthData = expenses.filter(e => {
                 const d = new Date(e.date);
                 return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
-            }).sort((a,b) => b.date - a.date); // Newest first
+            }).sort((a,b) => b.date - a.date);
 
-            // Calculate Total
-            const total = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
+            const total = monthData.reduce((sum, e) => sum + e.amount, 0);
             els.totalDisplay.innerText = total.toLocaleString('hu-HU');
 
-            // Render List
-            const listHtml = monthExpenses.map((e, i) => {
+            // List
+            document.getElementById('expenseList').innerHTML = monthData.map((e, i) => {
                 const globalIdx = expenses.indexOf(e);
+                const col = getCategoryColor(e.category);
                 return `
                 <li onclick="activateInput(${globalIdx})" class="history-item">
-                    <div>
-                        <div class="text-sm font-bold uppercase">${e.category}</div>
-                        <div class="text-[10px] text-zinc-500 font-bold uppercase">${new Date(e.date).toLocaleDateString('hu-HU')}</div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-2 h-2 rounded-full" style="background:${col}"></div>
+                        <div>
+                            <div class="text-sm font-bold uppercase text-white tracking-tight">${e.category}</div>
+                            <div class="text-[10px] text-zinc-600 font-bold uppercase">${new Date(e.date).toLocaleDateString('hu-HU')}</div>
+                        </div>
                     </div>
-                    <div class="text-lg font-mono-nums font-bold">${e.amount.toLocaleString('hu-HU')}</div>
+                    <div class="text-lg font-mono-nums font-bold text-white">${e.amount.toLocaleString('hu-HU')}</div>
                 </li>`;
             }).join('');
-            document.getElementById('expenseList').innerHTML = listHtml;
 
-            // Render Graph
-            renderSparkline(monthExpenses);
-            
-            // Update Comparison Pill
-            updateComparison(total);
-            
-            // Update Budget
+            renderGraph(monthData);
             updateBudgetStatus(total);
-
-            // Re-render Summary if active
-            if(isSummaryMode) renderSummary(monthExpenses);
+            if(isSummaryMode) renderSummary(monthData);
         }
 
         function renderCategories() {
-            // Sort by usage
             const sorted = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
-            
-            els.categoryView.innerHTML = sorted.map(c => `
-                <button onclick="saveTransaction('${c}')" class="cat-btn" oncontextmenu="deleteCategory('${c}'); return false;">
+            els.categoryView.innerHTML = sorted.map(c => {
+                const col = getCategoryColor(c);
+                return `
+                <button onclick="saveTransaction('${c}')" class="cat-btn" style="background-color: ${col};" oncontextmenu="deleteCategory('${c}'); return false;">
                     ${c}
-                </button>
-            `).join('');
+                </button>`;
+            }).join('');
         }
 
         function renderSummary(data) {
             const totals = {};
             let grand = 0;
             data.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; grand += e.amount; });
-            
             const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
             
             document.getElementById('summaryList').innerHTML = sorted.map(([cat, amt]) => {
-                const percent = grand > 0 ? ((amt/grand)*100).toFixed(0) : 0;
+                const col = getCategoryColor(cat);
+                const p = grand > 0 ? ((amt/grand)*100).toFixed(0) : 0;
                 return `
-                <li class="py-4 border-b border-zinc-800">
+                <li class="py-4 border-b border-zinc-900">
                     <div class="flex justify-between items-end mb-2">
-                        <span class="text-sm font-bold uppercase">${cat}</span>
-                        <span class="text-sm font-mono-nums font-bold">${amt.toLocaleString('hu-HU')}</span>
+                        <span class="text-xs font-bold uppercase text-zinc-400" style="color:${col}">${cat}</span>
+                        <span class="text-sm font-mono-nums font-bold text-white">${amt.toLocaleString('hu-HU')}</span>
                     </div>
-                    <div class="w-full bg-zinc-900 h-1 rounded-full overflow-hidden">
-                        <div class="bg-white h-full" style="width: ${percent}%"></div>
+                    <div class="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden">
+                        <div class="h-full" style="width: ${p}%; background-color: ${col}"></div>
                     </div>
                 </li>`;
             }).join('');
         }
 
-        function renderSparkline(data) {
+        function renderGraph(data) {
             const svg = document.getElementById('sparklineSvg');
             if (data.length === 0) { svg.innerHTML = ''; return; }
-
-            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
-            const daily = new Array(daysInMonth).fill(0);
+            const days = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
+            const daily = new Array(days).fill(0);
+            data.forEach(e => daily[new Date(e.date).getDate()-1] += e.amount);
             
-            data.forEach(e => {
-                const d = new Date(e.date).getDate();
-                daily[d-1] += e.amount;
-            });
-
             const max = Math.max(...daily, 100);
-            const width = 100; 
-            const height = 100;
-            
-            let pathD = `M 0 ${height} `;
+            const w = 100, h = 100;
+            let d = `M 0 ${h} `;
             daily.forEach((val, i) => {
-                const x = (i / (daysInMonth - 1)) * width;
-                const y = height - ((val / max) * height);
-                pathD += `L ${x} ${y} `;
+                const x = (i / (days-1)) * w;
+                const y = h - ((val/max)*h);
+                d += `L ${x} ${y} `;
             });
-
-            // Use black line since background is green
-            svg.innerHTML = `
-                <path d="${pathD}" fill="none" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" />
-                <path d="${pathD} L 100 100 L 0 100 Z" fill="black" fill-opacity="0.1" stroke="none" />
-            `;
+            svg.innerHTML = `<path d="${d}" class="sparkline-path" vector-effect="non-scaling-stroke" />`;
         }
-
-        // --- UTILS ---
 
         function renderDateScroller() {
             const days = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
-            const today = new Date().setHours(12,0,0,0);
-            
             let html = '';
             for(let i=1; i<=days; i++) {
-                const d = new Date(viewDate.getFullYear(), viewDate.getMonth(), i);
-                const ts = d.setHours(12,0,0,0);
-                const isSel = ts === selectedTimestamp;
-                
-                html += `
-                <div onclick="selectedTimestamp=${ts}; renderDateScroller()" class="date-card ${isSel ? 'selected' : ''}">
-                    <span class="text-[8px] font-bold uppercase opacity-60">${d.toLocaleString('en-US', {weekday:'short'})}</span>
-                    <span class="text-lg font-bold leading-none">${i}</span>
+                const ts = new Date(viewDate.getFullYear(), viewDate.getMonth(), i).setHours(12,0,0,0);
+                const sel = ts === selectedTimestamp ? 'selected' : '';
+                html += `<div onclick="selectedTimestamp=${ts}; renderDateScroller()" class="date-card ${sel}">
+                    <span class="text-[8px] font-bold uppercase">${new Date(ts).toLocaleString('en-US',{weekday:'short'})}</span>
+                    <span class="text-lg font-bold">${i}</span>
                 </div>`;
             }
             els.scroller.innerHTML = html;
-            
-            // Auto scroll to selection
-            const selEl = document.querySelector('.date-card.selected');
-            if(selEl) selEl.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+            const el = document.querySelector('.date-card.selected');
+            if(el) el.scrollIntoView({behavior:'smooth', inline:'center'});
         }
 
         function syncDateToView() {
             const now = new Date();
-            if (viewDate.getMonth() === now.getMonth()) {
-                selectedTimestamp = now.setHours(12,0,0,0);
-            } else {
-                selectedTimestamp = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).setHours(12,0,0,0);
-            }
+            if(viewDate.getMonth() === now.getMonth()) selectedTimestamp = now.setHours(12,0,0,0);
+            else selectedTimestamp = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).setHours(12,0,0,0);
         }
 
-        function changeMonth(dir) {
-            viewDate.setMonth(viewDate.getMonth() + dir);
-            renderAll();
-        }
+        function changeMonth(d) { viewDate.setMonth(viewDate.getMonth()+d); renderAll(); }
         function jumpToToday() { viewDate = new Date(); renderAll(); }
-
+        
         function toggleView() {
             isSummaryMode = !isSummaryMode;
-            els.viewBtn.innerText = isSummaryMode ? "ACTIVITY" : "SUMMARY";
+            els.viewBtn.classList.toggle('active', isSummaryMode);
             els.activityView.classList.toggle('hidden', isSummaryMode);
             els.summaryView.classList.toggle('hidden', !isSummaryMode);
             if(isSummaryMode) renderSummary(expenses.filter(e => new Date(e.date).getMonth() === viewDate.getMonth()));
         }
 
-        function updateComparison(currentTotal) {
-            // Simple Month-to-Date vs Previous Month
-            // (Simplified for this version to keep code tight)
-            const pill = document.getElementById('comparisonPill');
-            pill.innerText = ""; // Keeping it minimal for the Swiss look unless requested
-        }
-
         function setBudget() {
-            const n = prompt("Set Monthly Budget:", budgetLimit);
+            const n = prompt("Set Budget:", budgetLimit);
             if(n) { budgetLimit = parseFloat(n); localStorage.setItem('budgetLimit', budgetLimit); renderAll(); }
         }
-
-        function updateBudgetStatus(currentTotal) {
-            const btn = document.getElementById('budgetStatus');
-            if (budgetLimit > 0) {
-                const left = budgetLimit - currentTotal;
-                btn.innerText = `${left.toLocaleString()} LEFT`;
-                btn.style.color = left < 0 ? '#ef4444' : '#52525b';
+        function updateBudgetStatus(total) {
+            const el = document.getElementById('budgetStatus');
+            if(budgetLimit > 0) {
+                const diff = budgetLimit - total;
+                el.innerText = `${diff.toLocaleString()} LEFT`;
+                el.style.color = diff < 0 ? '#EB5757' : '#52525b';
             }
         }
-
-        function addNewCategory() {
-            const n = prompt("New Category Name:");
+        
+        function addNewCategory() { 
+            const n = prompt("New Category:"); 
             if(n && !categories.includes(n)) { categories.push(n); localStorage.setItem('categories', JSON.stringify(categories)); renderCategories(); }
         }
-
-        function deleteCategory(cat) {
-            if(confirm(`Delete category ${cat}?`)) {
-                categories = categories.filter(c => c !== cat);
-                localStorage.setItem('categories', JSON.stringify(categories));
-                renderCategories();
-            }
+        function deleteCategory(c) {
+            if(confirm("Delete "+c+"?")) { categories=categories.filter(x=>x!==c); localStorage.setItem('categories', JSON.stringify(categories)); renderCategories(); }
         }
-        
-        function clearAll() { if(confirm("Reset everything?")) { localStorage.clear(); location.reload(); } }
-        
+        function clearAll() { if(confirm("Reset?")) { localStorage.clear(); location.reload(); } }
         function exportToCSV() {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${new Date(e.date).toLocaleDateString()}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `Spend.csv`; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = `spend.csv`; a.click();
         }
 
-        // INIT
         init();
-
     </script>
 </body>
 </html>

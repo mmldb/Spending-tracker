@@ -17,51 +17,43 @@
         .stack-item:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
         .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; border-bottom: none; }
         
-        /* Categories - COMPACT & TIGHT */
-        .category-chip { 
-            transition: all 0.2s; 
-            border: 1px solid #27272a; 
-            font-weight: 800; 
-            min-height: 45px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            user-select: none; 
-            -webkit-user-select: none; 
-        }
+        /* Categories */
+        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; min-height: 45px; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; }
         .active-edit { border-color: #FFFFFF !important; background: #333333 !important; }
         
-        /* Visibility States */
+        /* Visibility */
         .hidden-grid { display: none !important; }
         .full-screen-mode .hide-on-input { display: none !important; }
         .full-screen-mode #inputSection { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; height: 100%; }
         
-        /* SCROLLABLE GRID (4x3 View) */
+        /* Grid & Scroller */
         .full-screen-mode #categoryGrid { 
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 4px;
-            max-height: 300px; 
-            overflow-y: auto;
-            flex-grow: 0; 
-            flex-shrink: 1; 
-            padding-bottom: 20px;
-            scrollbar-width: none; 
-            -ms-overflow-style: none;
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; 
+            max-height: 300px; overflow-y: auto; flex-grow: 0; flex-shrink: 1; 
+            padding-bottom: 20px; scrollbar-width: none; 
         }
         .full-screen-mode #categoryGrid::-webkit-scrollbar { display: none; }
         
-        /* Scroller */
         .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
         .date-scroller::-webkit-scrollbar { display: none; }
         .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; position: relative; user-select: none; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
         .today-dot { position: absolute; bottom: 6px; width: 4px; height: 4px; background: currentColor; border-radius: 50%; opacity: 0.5; }
         
-        /* Summary Bars */
+        /* Summary & Waterline */
         .progress-bar { height: 10px; border-radius: 5px; background: #1c1c1e; overflow: hidden; margin-top: 12px; }
         .progress-fill { height: 100%; transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
         
+        /* The Waterline (Budget Bar) */
+        .waterline-container { height: 4px; width: 100%; background: #1c1c1e; border-radius: 2px; overflow: hidden; margin-top: 8px; position: relative; }
+        .waterline-fill { height: 100%; background: #333; width: 0%; transition: width 0.5s ease-out; }
+        
+        /* Comparison Pill */
+        .pill { font-size: 10px; font-weight: 900; padding: 4px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; margin-left: 8px; vertical-align: middle; }
+        .pill-good { background: rgba(34, 197, 94, 0.2); color: #4ade80; } /* Green */
+        .pill-bad { background: rgba(239, 68, 68, 0.2); color: #f87171; } /* Red */
+        .pill-neutral { background: #27272a; color: #71717a; }
+
         input::placeholder { color: #27272a; }
     </style>
 </head>
@@ -69,15 +61,27 @@
     <div class="app-container">
         
         <div id="mainHeader" class="hide-on-input">
-            <div class="flex justify-between items-center mb-2 px-1">
-                <button onclick="changeMonth(-1)" class="text-zinc-600 text-xl font-black p-2"><<<</button>
-                <span onclick="jumpToToday()" id="currentMonthLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer">JANUARY 2026</span>
-                <button onclick="changeMonth(1)" class="text-zinc-600 text-xl font-black p-2">>>></button>
+            <div class="flex justify-between items-center mb-4 px-1">
+                <div class="flex items-center gap-4">
+                     <button onclick="changeMonth(-1)" class="text-zinc-600 text-xl font-black"><<<</button>
+                     <span onclick="jumpToToday()" id="currentMonthLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer">JANUARY 2026</span>
+                     <button onclick="changeMonth(1)" class="text-zinc-600 text-xl font-black">>>></button>
+                </div>
+                <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-800">Summary</button>
             </div>
 
-            <div class="flex justify-between items-start mb-10 px-1">
-                <h2 id="totalDisplay" class="text-4xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
-                <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-800">Summary</button>
+            <div class="mb-10 px-1 relative group">
+                <div class="flex items-baseline cursor-pointer" onclick="setBudget()">
+                    <h2 id="totalDisplay" class="text-5xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
+                    <span id="comparisonPill" class="pill pill-neutral">--</span>
+                </div>
+                <div class="waterline-container">
+                    <div id="waterlineFill" class="waterline-fill"></div>
+                </div>
+                <div class="flex justify-between mt-1">
+                    <span id="budgetLabel" class="text-[9px] font-bold text-zinc-700 uppercase tracking-widest">Tap to set limit</span>
+                    <span id="overallPill" class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest"></span>
+                </div>
             </div>
         </div>
 
@@ -91,9 +95,7 @@
                 class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-6 text-white shrink-0">
             
             <div id="dateLocationTop" class="shrink-0"></div>
-
             <div id="categoryGrid" class="hidden-grid mb-4"></div>
-
             <div id="dateLocationBottom" class="mt-auto shrink-0 pb-4"></div>
         </div>
 
@@ -120,11 +122,13 @@
     <script>
         const PALETTE = ['#1c1c1e', '#2c2c2e', '#3a3a3c', '#48484a', '#636366', '#8e8e93', '#c7c7cc', '#F8F8F2'];
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
-        let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi', 'Gym', 'Coffee', 'Transport', 'Savings', 'Gifts', 'Pets'];
+        let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi', 'Gym', 'Coffee'];
         let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
         if (Array.isArray(categoryUsage)) categoryUsage = {};
-
         let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
+        
+        let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 0;
+        
         let viewDate = new Date();
         let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditIdx = null;
@@ -147,15 +151,10 @@
             let val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
             if (val.length > 0) {
                 e.target.value = Number(val).toLocaleString('hu-HU').replace(/,/g, ' ');
-                
                 document.body.classList.add('full-screen-mode');
                 document.getElementById('categoryGrid').classList.remove('hidden-grid');
-                
-                if (currentEditIdx === null) {
-                    document.getElementById('dateLocationBottom').appendChild(dateSelector);
-                }
+                if (currentEditIdx === null) document.getElementById('dateLocationBottom').appendChild(dateSelector);
                 dateSelector.classList.remove('hidden-grid');
-                
                 renderDateScroller();
                 renderCategories();
             } else {
@@ -171,25 +170,18 @@
                 }
             }, 800);
         }
-
         function cancelLongPress() { clearTimeout(longPressTimer); }
 
         function renderCategories() {
             const sorted = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
-
             document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
                 const col = getColor(c);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
                 const isEdit = currentEditIdx !== null && expenses[currentEditIdx].category === c;
-                
                 return `
                 <button 
-                    onmousedown="startLongPress('${c}')" 
-                    onmouseup="cancelLongPress()" 
-                    onmouseleave="cancelLongPress()"
-                    ontouchstart="startLongPress('${c}')" 
-                    ontouchend="cancelLongPress()" 
-                    ontouchmove="cancelLongPress()"
+                    onmousedown="startLongPress('${c}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()"
+                    ontouchstart="startLongPress('${c}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()"
                     onclick="saveTransaction('${c}')" 
                     style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" 
                     class="category-chip rounded-xl text-[10px] font-black uppercase ${isEdit ? 'active-edit' : ''}">
@@ -202,50 +194,38 @@
             const today = new Date().setHours(12,0,0,0);
             const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
             let html = '';
-            
             for(let i = 1; i <= daysInMonth; i++) {
                 const dateObj = new Date(viewDate.getFullYear(), viewDate.getMonth(), i);
                 const dayName = dateObj.toLocaleString('en-US', { weekday: 'short' });
                 const ts = dateObj.setHours(12,0,0,0);
                 const isSelected = ts === selectedTimestamp;
                 const isToday = ts === today;
-                
-                html += `
-                    <div id="day-${i}" onclick="selectDate(${ts})" class="date-card ${isSelected ? 'selected' : ''}">
+                html += `<div id="day-${i}" onclick="selectDate(${ts})" class="date-card ${isSelected ? 'selected' : ''}">
                         <span class="text-[10px] font-bold uppercase">${dayName}</span>
                         <span class="text-lg font-black">${i}</span>
                         ${isToday ? '<div class="today-dot"></div>' : ''}
-                    </div>
-                `;
+                    </div>`;
             }
             scroller.innerHTML = html;
-            
             const selectedDay = new Date(selectedTimestamp).getDate();
-            const cardWidth = 68; 
-            const containerWidth = scroller.offsetWidth;
+            const cardWidth = 68; const containerWidth = scroller.offsetWidth;
             if (selectedDay <= 3) scroller.scrollLeft = 0;
             else if (selectedDay >= daysInMonth - 2) scroller.scrollLeft = scroller.scrollWidth;
             else scroller.scrollLeft = (selectedDay * cardWidth) - (containerWidth / 2) - (cardWidth / 2);
         }
 
-        function selectDate(ts) {
-            selectedTimestamp = ts;
-            renderDateScroller();
-        }
+        function selectDate(ts) { selectedTimestamp = ts; renderDateScroller(); }
 
         function saveTransaction(cat) {
             const raw = amountInput.value.replace(/\s+/g, '');
             if(!raw) return;
-
             if (currentEditIdx !== null) {
                 expenses[currentEditIdx] = { ...expenses[currentEditIdx], category: cat, amount: parseFloat(raw), date: selectedTimestamp };
             } else {
                 expenses.push({ category: cat, amount: parseFloat(raw), date: selectedTimestamp, color: getColor(cat) });
             }
-            
             categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
             localStorage.setItem('categoryUsage', JSON.stringify(categoryUsage));
-            
             resetInput();
             renderAll();
         }
@@ -260,7 +240,7 @@
         }
 
         function editItem(idx) {
-            // Find actual index in global expenses array
+            // Logic to find item in sorted/filtered view vs main array
             const filtered = expenses
                 .map((e, i) => ({...e, originalIndex: i}))
                 .filter(e => {
@@ -271,25 +251,96 @@
                     if (b.date !== a.date) return b.date - a.date;
                     return b.originalIndex - a.originalIndex;
                 });
-                
-            // The clicked item is from the filtered/sorted view. 
-            // We need the original index to edit the main array.
-            // Since we passed 'origIdx' in renderAll, 'idx' IS the original index.
             
+            // Map the filtered index back to the real index
             currentEditIdx = idx;
             const item = expenses[idx];
             selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
             amountInput.value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
-            
             document.body.classList.add('full-screen-mode');
             document.getElementById('dateLocationTop').appendChild(dateSelector);
             document.getElementById('categoryGrid').classList.remove('hidden-grid');
             dateSelector.classList.remove('hidden-grid');
-            
             renderDateScroller();
             renderCategories();
             amountInput.focus();
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function setBudget() {
+            const newLimit = prompt("Set Monthly Budget limit (Ft):", budgetLimit);
+            if (newLimit !== null) {
+                budgetLimit = parseFloat(newLimit);
+                localStorage.setItem('budgetLimit', budgetLimit);
+                renderAll();
+            }
+        }
+
+        function calculateMetrics(currentTotal) {
+            // 1. Waterline
+            const waterline = document.getElementById('waterlineFill');
+            const budgetLabel = document.getElementById('budgetLabel');
+            
+            if (budgetLimit > 0) {
+                const percent = Math.min((currentTotal / budgetLimit) * 100, 100);
+                waterline.style.width = `${percent}%`;
+                
+                if (percent < 50) waterline.style.backgroundColor = '#3f3f46'; // zinc-700
+                else if (percent < 85) waterline.style.backgroundColor = '#fbbf24'; // amber-400
+                else waterline.style.backgroundColor = '#ef4444'; // red-500
+                
+                budgetLabel.innerText = `${(budgetLimit - currentTotal).toLocaleString('hu-HU')} Ft Left`;
+            } else {
+                waterline.style.width = '0%';
+                budgetLabel.innerText = "Set Budget";
+            }
+
+            // 2. Comparison Pill (Strict Month-to-Date)
+            const todayDay = new Date().getDate(); // e.g. 15
+            const currentMonthIdx = viewDate.getMonth();
+            const currentYear = viewDate.getFullYear();
+
+            // Previous Month Total (up to the same day)
+            // Handle January roll-back
+            let prevMonthIdx = currentMonthIdx - 1;
+            let prevYear = currentYear;
+            if (prevMonthIdx < 0) { prevMonthIdx = 11; prevYear = currentYear - 1; }
+
+            const prevMonthTotal = expenses.filter(e => {
+                const d = new Date(e.date);
+                return d.getMonth() === prevMonthIdx && 
+                       d.getFullYear() === prevYear && 
+                       d.getDate() <= todayDay; // IMPORTANT: Only up to the same day
+            }).reduce((sum, e) => sum + e.amount, 0);
+
+            const pill = document.getElementById('comparisonPill');
+            
+            if (prevMonthTotal > 0) {
+                const diff = currentTotal - prevMonthTotal;
+                const percentDiff = ((diff / prevMonthTotal) * 100).toFixed(0);
+                
+                if (diff < 0) {
+                    pill.className = "pill pill-good";
+                    pill.innerText = `↓ ${Math.abs(percentDiff)}%`;
+                } else if (diff > 0) {
+                    pill.className = "pill pill-bad";
+                    pill.innerText = `↑ ${Math.abs(percentDiff)}%`;
+                } else {
+                    pill.className = "pill pill-neutral";
+                    pill.innerText = "= 0%";
+                }
+            } else {
+                pill.className = "pill pill-neutral";
+                pill.innerText = "--";
+            }
+
+            // 3. Overall Indicator (Average)
+            // Just basic daily average tracking for "Overall"
+            // Filter all expenses ever
+            const totalSpentEver = expenses.reduce((sum, e) => sum + e.amount, 0);
+            // Count unique days with spending? Or just days since first entry?
+            // Simple approach: Total / 30 for a rough "Monthly Average" feel
+            // Or compare current month vs Average of all previous full months.
         }
 
         function changeMonth(dir) { viewDate.setMonth(viewDate.getMonth() + dir); renderAll(); if(isSummaryMode) renderSummary(); }
@@ -315,7 +366,6 @@
             const list = document.getElementById('expenseList');
             document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-            // Sort: 1. By Date (Newest first) 2. By Insertion Order (Newest ID first)
             const filtered = expenses
                 .map((e, i) => ({ ...e, originalIndex: i }))
                 .filter(e => {
@@ -343,8 +393,12 @@
                 </li>`;
             }).join('');
 
-            const total = filtered.reduce((sum, e) => sum + e.amount, 0);
-            document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
+            const currentTotal = filtered.reduce((sum, e) => sum + e.amount, 0);
+            document.getElementById('totalDisplay').innerText = `${currentTotal.toLocaleString('hu-HU')} Ft`;
+            
+            // RUN METRICS
+            calculateMetrics(currentTotal);
+            
             localStorage.setItem('expenses', JSON.stringify(expenses));
         }
 

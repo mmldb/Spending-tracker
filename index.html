@@ -7,439 +7,467 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* CORE RESET - ENABLE SCROLLING */
+        /* CORE RESET */
         html { background-color: #000000; }
         body { 
             background-color: #000000; 
             color: #FFFFFF; 
             -webkit-tap-highlight-color: transparent; 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden;
+            overscroll-behavior-y: none;
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            min-height: 100vh;
-            overflow-x: hidden;
-            overflow-y: auto; /* Enable Scroll */
         }
 
         .app-container { 
             max-width: 28rem; 
             margin: 0 auto; 
+            width: 100%; 
             padding: 1.5rem; 
-            min-height: 100vh;
+            height: 100%;
             display: flex;
             flex-direction: column;
         }
         
-        /* Stack Items */
-        .stack-list { display: flex; flex-direction: column; }
-        .stack-item { 
+        /* --- THE CONTROL GRID (2x2) --- */
+        .control-card {
+            background: #1c1c1e;
+            border: 1px solid #27272a;
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100px; /* Fixed height for consistency */
             position: relative;
-            border: 1px solid #27272a; 
-            margin-bottom: -1px; 
-            padding: 16px;
-            background: #000000;
-            overflow: hidden;
+            transition: all 0.1s;
+        }
+        .control-card:active { transform: scale(0.96); background: #27272a; }
+        
+        /* Specific Styles for Quadrants */
+        .btn-add { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
+        .btn-add:active { background: #e4e4e7; }
+        
+        .btn-sum { color: #a1a1aa; }
+        .btn-sum.active { background: #333; color: #FFF; border-color: #555; }
+
+        /* --- STACK ITEMS --- */
+        .stack-list { display: flex; flex-direction: column; padding-bottom: 40px; }
+        .stack-item { 
+            border: 1px solid #27272a; margin-bottom: -1px; padding: 16px; background: #000000;
         }
         .stack-item:first-child { border-top-left-radius: 20px; border-top-right-radius: 20px; }
         .stack-item:last-child { border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; border-bottom: 1px solid #27272a; margin-bottom: 0; }
         
-        /* Summary Background Fill */
-        .summary-fill {
-            position: absolute; top: 0; left: 0; bottom: 0;
-            z-index: 0; transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
-            opacity: 0.35;
+        /* --- INPUT MODE OVERLAY --- */
+        /* Takes over the grid area when active */
+        .input-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000000; z-index: 50; padding: 1.5rem;
+            display: flex; flex-direction: column;
         }
-        .summary-content { position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Categories Grid */
+        .category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; flex: 1; overflow-y: auto; }
+        .category-btn { 
+            background: #1c1c1e; border: 1px solid #27272a; 
+            border-radius: 16px; height: 60px; 
+            font-weight: 800; font-size: 12px; uppercase; 
+            display: flex; align-items: center; justify-content: center;
+        }
+        .category-btn:active { background: #333; border-color: #fff; }
 
-        /* Categories */
-        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; min-height: 45px; display: flex; align-items: center; justify-content: center; user-select: none; }
-        .active-edit { border-color: #FFFFFF !important; background: #333333 !important; }
-        
-        /* UTILS */
-        .hidden-grid { display: none !important; }
-        
-        /* FULL SCREEN INPUT MODE (Locks scroll only when typing) */
-        body.full-screen-mode { overflow: hidden; position: fixed; width: 100%; height: 100%; }
-        .full-screen-mode .hide-on-input { display: none !important; }
-        .full-screen-mode #inputSection { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            z-index: 50; background: #000000; padding: 2rem; 
-            display: flex; flex-direction: column; 
-        }
-        .full-screen-mode #categoryGrid { 
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; 
-            max-height: 400px; overflow-y: auto; flex-grow: 1; margin-bottom: 20px; 
-        }
-        
+        /* --- VISUALS --- */
+        .pill { font-size: 10px; font-weight: 900; padding: 4px 8px; border-radius: 6px; text-transform: uppercase; }
+        .pill-good { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+        .pill-bad { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+        .pill-neutral { background: rgba(255, 255, 255, 0.05); color: #71717a; }
+
+        .summary-fill { position: absolute; top: 0; left: 0; bottom: 0; opacity: 0.25; z-index: 0; }
+        .summary-content { position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: center; width: 100%; }
+
+        /* Graph */
+        .chart-line { fill: none; stroke: #fff; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; }
+        .chart-area { fill: url(#gradient); opacity: 0.3; }
+
         /* Scroller */
         .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; }
         .date-scroller::-webkit-scrollbar { display: none; }
         .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
-        .today-dot { position: absolute; bottom: 6px; width: 4px; height: 4px; background: currentColor; border-radius: 50%; opacity: 0.5; }
-        
-        /* Metrics */
-        .waterline-container { height: 4px; width: 100%; background: #1c1c1e; border-radius: 2px; overflow: hidden; margin-top: 8px; position: relative; }
-        .waterline-fill { height: 100%; background: #333; width: 0%; transition: width 0.5s ease-out; }
-        
-        /* Pills & Graph */
-        .pill { font-size: 9px; font-weight: 900; padding: 3px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; vertical-align: middle; }
-        .pill-good { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
-        .pill-bad { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-        .pill-neutral { background: rgba(255, 255, 255, 0.1); color: #a1a1aa; }
-        
-        .chart-point { r: 3; fill: #1c1c1e; stroke: #fff; stroke-width: 2px; }
-        .chart-line { fill: none; stroke: #fff; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; }
-        .chart-area { fill: url(#gradient); opacity: 0.3; }
-        
-        /* Dots */
-        .dots-container { display: flex; gap: 6px; margin-top: 10px; opacity: 0.5; }
-        .dot { width: 6px; height: 6px; border-radius: 50%; background: #333; transition: all 0.3s; }
-        .dot.active { background: #FFF; width: 12px; border-radius: 3px; }
 
-        input::placeholder { color: #27272a; }
+        .hidden { display: none !important; }
+        input::placeholder { color: #333; }
     </style>
 </head>
 <body class="font-sans text-sm">
     <div class="app-container">
         
-        <div id="mainHeader" class="hide-on-input mb-8">
-            <div class="flex flex-col items-start mb-6">
-                <div class="flex items-center gap-4 mb-2">
-                    <button onclick="changeMonth(-1)" class="text-zinc-600 text-xl font-black py-2 pr-2 hover:text-white"><<<</button>
-                    <span onclick="jumpToToday()" id="currentMonthLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer">JANUARY 2026</span>
-                    <button onclick="changeMonth(1)" class="text-zinc-600 text-xl font-black py-2 pl-2 hover:text-white">>>></button>
-                </div>
-                
-                <div class="dots-container mb-4">
-                    <div id="dot1" class="dot active"></div>
-                    <div id="dot2" class="dot"></div>
-                </div>
-            </div>
+        <div class="flex justify-between items-center mb-6 px-2">
+            <button onclick="changeMonth(-1)" class="text-zinc-600 text-2xl font-black p-2"><<<</button>
+            <span onclick="jumpToToday()" id="currentMonthLabel" class="text-xs font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer">JANUARY 2026</span>
+            <button onclick="changeMonth(1)" class="text-zinc-600 text-2xl font-black p-2">>>></button>
+        </div>
 
-            <div class="cursor-pointer" onclick="setBudget()">
-                <div class="flex items-baseline justify-start">
-                    <h2 id="totalDisplay" class="text-5xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
-                </div>
-                <div class="waterline-container"><div id="waterlineFill" class="waterline-fill"></div></div>
-                <div class="flex justify-start mt-2">
-                    <span id="budgetLabel" class="text-[9px] font-bold text-zinc-700 uppercase tracking-widest">Set limit</span>
-                </div>
+        <div class="mb-8 px-2">
+            <h2 id="totalDisplay" class="text-6xl font-black tabular-nums tracking-tighter text-white leading-none mb-4">0 Ft</h2>
+            <div class="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
+                <div id="waterlineFill" class="h-full bg-white transition-all duration-500" style="width: 0%"></div>
             </div>
         </div>
 
-        <div id="inputSection" class="mb-12 relative flex flex-col shrink-0">
-            <div id="editHeader" class="flex justify-between items-center mb-2 shrink-0 hidden-grid">
-                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Amount</span>
-                <button id="cancelBtn" onclick="resetInput()" class="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white">Cancel</button>
-            </div>
+        <div class="grid grid-cols-2 gap-3 mb-8">
             
-            <div id="catBtnContainer" class="flex justify-end mb-2 hidden-grid">
-                <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
+            <button onclick="openInputMode()" class="control-card btn-add">
+                <span class="text-4xl font-black">+</span>
+            </button>
+
+            <div class="control-card">
+                <span class="text-[9px] font-black uppercase text-zinc-600 tracking-widest mb-1">VS LAST MONTH</span>
+                <div id="comparisonContainer">
+                    <span class="pill pill-neutral">--</span>
+                </div>
             </div>
 
-            <input id="amount" type="text" inputmode="decimal" placeholder="0" 
-                class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-6 text-white shrink-0 text-left">
-            
-            <div id="dateLocationTop" class="shrink-0"></div>
-            <div id="categoryGrid" class="hidden-grid mb-4"></div>
-            <div id="dateLocationBottom" class="mt-auto shrink-0 pb-4"></div>
+            <button onclick="setBudget()" class="control-card">
+                <span class="text-[9px] font-black uppercase text-zinc-600 tracking-widest mb-1">REMAINING</span>
+                <span id="budgetLeftLabel" class="text-lg font-bold tabular-nums text-white">--</span>
+            </button>
+
+            <button onclick="toggleSummary()" id="btnSummary" class="control-card btn-sum">
+                <span class="text-sm font-black uppercase tracking-widest">SUM</span>
+            </button>
         </div>
 
-        <div id="dateSelector" class="hidden-grid">
-            <span class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-2">Select Date</span>
-            <div id="scroller" class="date-scroller mb-2"></div>
-        </div>
-
-        <div id="contentArea" class="hide-on-input flex-1 pb-10">
+        <div class="flex-1 overflow-y-auto -mx-2 px-2">
             
             <div id="activityView">
-                <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-800 mb-4 pl-1">Recent Activity</h3>
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-800 mb-3 ml-1">Recent Activity</h3>
                 <ul id="expenseList" class="stack-list"></ul>
             </div>
-            
-            <div id="summaryView" class="hidden-grid">
-                <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-800 mb-4 pl-1">Monthly Breakdown</h3>
-                <ul id="summaryList" class="stack-list mb-12"></ul>
+
+            <div id="summaryView" class="hidden">
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-800 mb-3 ml-1">Breakdown</h3>
+                <ul id="summaryList" class="stack-list mb-8"></ul>
                 
-                <div class="mb-4">
-                     <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-4">Spending Trend</h3>
-                     <div id="chartContainer" class="w-full h-40 bg-[#1c1c1e] rounded-2xl p-4 relative overflow-hidden flex items-end">
+                <div class="p-4 bg-[#1c1c1e] rounded-3xl border border-zinc-800 mb-8">
+                    <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-4">Trend (This Month)</h3>
+                    <div class="h-32 w-full flex items-end">
                         <svg id="spendingChart" class="w-full h-full overflow-visible" preserveAspectRatio="none"></svg>
-                     </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div id="footerArea" class="mt-8 flex justify-between items-center opacity-20 hide-on-input">
+        <div id="inputOverlay" class="input-overlay hidden">
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="closeInputMode()" class="text-zinc-500 font-bold text-xs uppercase tracking-widest">Cancel</button>
+                <span class="text-zinc-700 font-black text-xs uppercase tracking-widest">New Entry</span>
+                <button onclick="addNewCategory()" class="text-white font-bold text-xs uppercase tracking-widest">+ Cat</button>
+            </div>
+
+            <input id="amountInput" type="text" inputmode="decimal" placeholder="0" 
+                class="w-full bg-transparent border-b-2 border-zinc-800 py-4 text-6xl font-black text-center outline-none focus:border-white transition-colors mb-8 text-white">
+
+            <div id="categoryGrid" class="category-grid mb-6"></div>
+
+            <div class="mt-auto">
+                <span class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest block mb-3 text-center">Select Date</span>
+                <div id="dateScroller" class="date-scroller"></div>
+            </div>
+        </div>
+
+        <div class="mt-4 flex justify-between items-center opacity-20">
             <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest">CSV</button>
             <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest text-red-900">Reset</button>
         </div>
     </div>
 
     <script>
+        // CONFIG
         const PALETTE = ['#1c1c1e', '#2c2c2e', '#3a3a3c', '#48484a', '#636366', '#8e8e93', '#c7c7cc', '#F8F8F2'];
+        
+        // STATE
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
-        let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi', 'Gym', 'Coffee'];
+        let categories = JSON.parse(localStorage.getItem('categories')) || ['Food', 'Transport', 'Rent', 'Tech', 'Health', 'Fun'];
         let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
-        if (Array.isArray(categoryUsage)) categoryUsage = {};
         let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
         let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 0;
         
         let viewDate = new Date();
         let selectedTimestamp = new Date().setHours(12,0,0,0);
-        let currentEditIdx = null;
         let isSummaryMode = false;
-        let longPressTimer;
 
-        // SWIPE
-        let touchStartX = 0, touchEndX = 0;
-        document.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; });
-        document.addEventListener('touchend', e => { touchEndX = e.changedTouches[0].screenX; handleSwipe(); });
-        function handleSwipe() {
-            if (document.body.classList.contains('full-screen-mode')) return;
-            const threshold = 60;
-            if (touchStartX - touchEndX > threshold && !isSummaryMode) toggleView();
-            if (touchEndX - touchStartX > threshold && isSummaryMode) toggleView();
+        // --- CORE FUNCTIONS ---
+
+        function init() {
+            renderAll();
+        }
+
+        // --- INPUT MODE LOGIC ---
+
+        function openInputMode() {
+            document.getElementById('inputOverlay').classList.remove('hidden');
+            document.getElementById('amountInput').value = '';
+            document.getElementById('amountInput').focus();
+            
+            // Default date to today/view month
+            syncSelectedDateToView();
+            renderCategories();
+            renderDateScroller();
+        }
+
+        function closeInputMode() {
+            document.getElementById('inputOverlay').classList.add('hidden');
+            document.getElementById('amountInput').blur();
+        }
+
+        function saveTransaction(cat) {
+            const raw = document.getElementById('amountInput').value.replace(/\s+/g, '');
+            if(!raw) return;
+            
+            const amt = parseFloat(raw);
+            expenses.push({ 
+                category: cat, 
+                amount: amt, 
+                date: selectedTimestamp,
+                color: getColor(cat)
+            });
+            
+            // Update usage
+            categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
+            localStorage.setItem('categoryUsage', JSON.stringify(categoryUsage));
+            
+            closeInputMode();
+            renderAll();
+        }
+
+        // --- RENDERERS ---
+
+        function renderAll() {
+            // Save state
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+
+            // Header
+            document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+            // Filter for View Date
+            const currentMonthData = expenses.filter(e => {
+                const d = new Date(e.date);
+                return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
+            }).sort((a,b) => b.date - a.date);
+
+            // Calculate Total
+            const total = currentMonthData.reduce((sum, e) => sum + e.amount, 0);
+            document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
+
+            // 1. Render Activity List
+            const listEl = document.getElementById('expenseList');
+            listEl.innerHTML = currentMonthData.map((e, i) => {
+                // Find original index for deletion (simple find for now)
+                const originalIndex = expenses.indexOf(e);
+                const col = getColor(e.category);
+                return `
+                <li class="stack-item flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-1 h-8 rounded-full" style="background:${col}"></div>
+                        <div class="flex flex-col">
+                            <span class="text-sm font-black uppercase tracking-tight">${e.category}</span>
+                            <span class="text-[9px] font-bold opacity-40 uppercase">${new Date(e.date).toLocaleDateString('hu-HU')}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-black text-md tabular-nums">${Math.round(e.amount).toLocaleString('hu-HU')}</span>
+                        <button onclick="deleteItem(${originalIndex})" class="text-xl opacity-20 hover:opacity-100 px-2">×</button>
+                    </div>
+                </li>`;
+            }).join('');
+
+            // 2. Render Summary List (Hidden but ready)
+            renderSummaryList(currentMonthData, total);
+
+            // 3. Update Control Grid Data
+            updateControlGrid(total);
+        }
+
+        function updateControlGrid(currentTotal) {
+            // A. Budget Remaining
+            const budgetLabel = document.getElementById('budgetLeftLabel');
+            const waterline = document.getElementById('waterlineFill');
+            
+            if (budgetLimit > 0) {
+                const left = budgetLimit - currentTotal;
+                budgetLabel.innerText = `${left.toLocaleString('hu-HU')} Ft`;
+                budgetLabel.style.color = left < 0 ? '#f87171' : '#FFFFFF';
+                
+                const pct = Math.min((currentTotal / budgetLimit) * 100, 100);
+                waterline.style.width = `${pct}%`;
+                waterline.style.backgroundColor = pct > 90 ? '#f87171' : '#FFFFFF';
+            } else {
+                budgetLabel.innerText = "Set";
+                budgetLabel.style.color = "#555";
+                waterline.style.width = '0%';
+            }
+
+            // B. Comparison (Same Day Logic)
+            const todayDay = new Date().getDate(); // Current Day of Month
+            
+            // Get Previous Month Total (up to same day)
+            let prevMonthIdx = viewDate.getMonth() - 1;
+            let prevYear = viewDate.getFullYear();
+            if (prevMonthIdx < 0) { prevMonthIdx = 11; prevYear -= 1; }
+
+            const prevExpenses = expenses.filter(e => {
+                const d = new Date(e.date);
+                return d.getMonth() === prevMonthIdx && 
+                       d.getFullYear() === prevYear && 
+                       d.getDate() <= todayDay; // Compare apples to apples
+            });
+            const prevTotal = prevExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+            const compContainer = document.getElementById('comparisonContainer');
+            if (prevTotal > 0) {
+                const diff = currentTotal - prevTotal;
+                const pct = ((diff / prevTotal) * 100).toFixed(0);
+                if (diff < 0) compContainer.innerHTML = `<span class="pill pill-good">↓ ${Math.abs(pct)}%</span>`;
+                else if (diff > 0) compContainer.innerHTML = `<span class="pill pill-bad">↑ ${Math.abs(pct)}%</span>`;
+                else compContainer.innerHTML = `<span class="pill pill-neutral">=</span>`;
+            } else {
+                compContainer.innerHTML = `<span class="pill pill-neutral">--</span>`;
+            }
+        }
+
+        function renderSummaryList(data, grandTotal) {
+            const totals = {};
+            data.forEach(e => totals[e.category] = (totals[e.category] || 0) + e.amount);
+            const sorted = Object.entries(totals).sort((a,b) => b[1] - a[1]);
+
+            const html = sorted.map(([cat, amt]) => {
+                const col = getColor(cat);
+                const pct = grandTotal > 0 ? (amt / grandTotal * 100).toFixed(0) : 0;
+                return `
+                <li class="stack-item">
+                    <div class="summary-fill" style="width: ${pct}%; background-color: ${col};"></div>
+                    <div class="summary-content">
+                        <span class="text-sm font-black uppercase tracking-tight">${cat}</span>
+                        <span class="text-md font-black tabular-nums">${Math.round(amt).toLocaleString('hu-HU')} Ft</span>
+                    </div>
+                </li>`;
+            }).join('');
+            document.getElementById('summaryList').innerHTML = html;
+            
+            renderGraph(data);
+        }
+
+        function renderCategories() {
+            const sorted = [...categories].sort((a,b) => (categoryUsage[b]||0) - (categoryUsage[a]||0));
+            document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
+                return `<button onclick="saveTransaction('${c}')" class="category-btn text-white uppercase">${c}</button>`;
+            }).join('');
+        }
+
+        function renderDateScroller() {
+            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
+            let html = '';
+            for(let i=1; i<=daysInMonth; i++) {
+                const ts = new Date(viewDate.getFullYear(), viewDate.getMonth(), i).setHours(12,0,0,0);
+                const isSel = ts === selectedTimestamp;
+                html += `<div onclick="selectedTimestamp=${ts}; renderDateScroller()" class="date-card ${isSel?'selected':''}">
+                    <span class="text-[9px] font-bold uppercase">DAY</span>
+                    <span class="text-lg font-black">${i}</span>
+                </div>`;
+            }
+            document.getElementById('dateScroller').innerHTML = html;
+        }
+
+        function renderGraph(data) {
+            // Simple daily aggregation
+            const days = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
+            const daily = new Array(days).fill(0);
+            data.forEach(e => {
+                const d = new Date(e.date).getDate();
+                daily[d-1] += e.amount;
+            });
+            
+            const max = Math.max(...daily, 10);
+            const svg = document.getElementById('spendingChart');
+            const w = svg.clientWidth || 300; const h = 128;
+            const step = w / (days-1);
+            
+            let pts = "";
+            let area = `0,${h} `;
+            
+            daily.forEach((val, i) => {
+                const x = i * step;
+                const y = h - ((val/max) * (h*0.8)); // 80% height max
+                pts += `${x},${y} `;
+                area += `${x},${y} `;
+            });
+            area += `${w},${h}`;
+            
+            svg.innerHTML = `
+                <defs>
+                    <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="white" stop-opacity="0.2"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient>
+                </defs>
+                <polygon points="${area}" class="chart-area" />
+                <polyline points="${pts}" class="chart-line" />
+            `;
+        }
+
+        // --- UTILS ---
+        
+        function toggleSummary() {
+            isSummaryMode = !isSummaryMode;
+            document.getElementById('btnSummary').classList.toggle('active', isSummaryMode);
+            document.getElementById('activityView').classList.toggle('hidden', isSummaryMode);
+            document.getElementById('summaryView').classList.toggle('hidden', !isSummaryMode);
+        }
+
+        function syncSelectedDateToView() {
+            const now = new Date();
+            // If viewing current month, default to today. Else 1st.
+            if(now.getMonth() === viewDate.getMonth()) selectedTimestamp = new Date().setHours(12,0,0,0);
+            else selectedTimestamp = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).setHours(12,0,0,0);
         }
 
         function getColor(cat) {
-            if (!categoryColors[cat]) {
+            if(!categoryColors[cat]) {
                 categoryColors[cat] = PALETTE[Object.keys(categoryColors).length % PALETTE.length];
                 localStorage.setItem('categoryColors', JSON.stringify(categoryColors));
             }
             return categoryColors[cat];
         }
 
-        const amountInput = document.getElementById('amount');
-        const scroller = document.getElementById('scroller');
-        const dateSelector = document.getElementById('dateSelector');
-        const editHeader = document.getElementById('editHeader');
-        const catBtnContainer = document.getElementById('catBtnContainer');
-
-        amountInput.addEventListener('input', (e) => {
-            let val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
-            if (val.length > 0) {
-                e.target.value = Number(val).toLocaleString('hu-HU').replace(/,/g, ' ');
-                document.body.classList.add('full-screen-mode');
-                editHeader.classList.remove('hidden-grid');
-                catBtnContainer.classList.remove('hidden-grid');
-                syncSelectedDateToView();
-                document.getElementById('categoryGrid').classList.remove('hidden-grid');
-                if (currentEditIdx === null) document.getElementById('dateLocationBottom').appendChild(dateSelector);
-                dateSelector.classList.remove('hidden-grid');
-                renderDateScroller();
-                renderCategories();
-            } else { if (currentEditIdx === null) resetInput(); }
+        // Listeners
+        document.getElementById('amountInput').addEventListener('input', (e) => {
+            e.target.value = Number(e.target.value.replace(/[^0-9]/g, '')).toLocaleString('hu-HU').replace(/,/g,' ');
         });
 
-        function syncSelectedDateToView() {
-            const currentSel = new Date(selectedTimestamp);
-            if(currentSel.getMonth() !== viewDate.getMonth() || currentSel.getFullYear() !== viewDate.getFullYear()) {
-                const today = new Date();
-                const targetDay = (today.getMonth() === viewDate.getMonth()) ? today.getDate() : 1; 
-                selectedTimestamp = new Date(viewDate.getFullYear(), viewDate.getMonth(), targetDay).setHours(12,0,0,0);
-            }
-        }
-
-        function startLongPress(cat) {
-            longPressTimer = setTimeout(() => {
-                if(confirm(`Delete category "${cat}" permanently?`)) { categories = categories.filter(c => c !== cat); renderCategories(); }
-            }, 800);
-        }
-        function cancelLongPress() { clearTimeout(longPressTimer); }
-
-        function renderCategories() {
-            const sorted = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
-            document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
-                const col = getColor(c);
-                const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
-                const isEdit = currentEditIdx !== null && expenses[currentEditIdx].category === c;
-                return `<button onmousedown="startLongPress('${c}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress('${c}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()" onclick="saveTransaction('${c}')" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" class="category-chip rounded-xl text-[10px] font-black uppercase ${isEdit ? 'active-edit' : ''}">${c}</button>`;
-            }).join('');
-        }
-
-        function renderDateScroller() {
-            const today = new Date().setHours(12,0,0,0);
-            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
-            let html = '';
-            for(let i = 1; i <= daysInMonth; i++) {
-                const dateObj = new Date(viewDate.getFullYear(), viewDate.getMonth(), i);
-                const dayName = dateObj.toLocaleString('en-US', { weekday: 'short' });
-                const ts = dateObj.setHours(12,0,0,0);
-                const isSelected = ts === selectedTimestamp;
-                const isToday = ts === today;
-                html += `<div id="day-${i}" onclick="selectDate(${ts})" class="date-card ${isSelected ? 'selected' : ''}"><span class="text-[10px] font-bold uppercase">${dayName}</span><span class="text-lg font-black">${i}</span>${isToday ? '<div class="today-dot"></div>' : ''}</div>`;
-            }
-            scroller.innerHTML = html;
-            const selectedDay = new Date(selectedTimestamp).getDate();
-            const cardWidth = 68; const containerWidth = scroller.offsetWidth;
-            if (selectedDay <= 3) scroller.scrollLeft = 0;
-            else if (selectedDay >= daysInMonth - 2) scroller.scrollLeft = scroller.scrollWidth;
-            else scroller.scrollLeft = (selectedDay * cardWidth) - (containerWidth / 2) - (cardWidth / 2);
-        }
-
-        function selectDate(ts) { selectedTimestamp = ts; renderDateScroller(); }
-
-        function saveTransaction(cat) {
-            const raw = amountInput.value.replace(/\s+/g, '');
-            if(!raw) return;
-            if (currentEditIdx !== null) { expenses[currentEditIdx] = { ...expenses[currentEditIdx], category: cat, amount: parseFloat(raw), date: selectedTimestamp }; }
-            else { expenses.push({ category: cat, amount: parseFloat(raw), date: selectedTimestamp, color: getColor(cat) }); }
-            categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
-            localStorage.setItem('categoryUsage', JSON.stringify(categoryUsage));
-            resetInput(); renderAll();
-        }
-
-        function resetInput() {
-            amountInput.value = '';
-            document.body.classList.remove('full-screen-mode');
-            editHeader.classList.add('hidden-grid'); catBtnContainer.classList.add('hidden-grid');
-            document.getElementById('categoryGrid').classList.add('hidden-grid');
-            dateSelector.classList.add('hidden-grid');
-            currentEditIdx = null; selectedTimestamp = new Date().setHours(12,0,0,0);
-        }
-
-        function editItem(idx) {
-            const filtered = expenses.map((e, i) => ({...e, originalIndex: i})).filter(e => new Date(e.date).getMonth() === viewDate.getMonth()).sort((a, b) => { if (b.date !== a.date) return b.date - a.date; return b.originalIndex - a.originalIndex; });
-            currentEditIdx = idx;
-            const item = expenses[idx];
-            selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
-            amountInput.value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
-            document.body.classList.add('full-screen-mode');
-            editHeader.classList.remove('hidden-grid'); catBtnContainer.classList.remove('hidden-grid');
-            document.getElementById('dateLocationTop').appendChild(dateSelector);
-            document.getElementById('categoryGrid').classList.remove('hidden-grid');
-            dateSelector.classList.remove('hidden-grid');
-            renderDateScroller(); renderCategories();
-            amountInput.focus(); window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        function setBudget() {
-            const newLimit = prompt("Set Monthly Budget limit (Ft):", budgetLimit);
-            if (newLimit !== null) { budgetLimit = parseFloat(newLimit); localStorage.setItem('budgetLimit', budgetLimit); renderAll(); }
-        }
-
-        function calculateMetrics(currentTotal) {
-            const waterline = document.getElementById('waterlineFill');
-            const budgetLabel = document.getElementById('budgetLabel');
-            if (budgetLimit > 0) {
-                const percent = Math.min((currentTotal / budgetLimit) * 100, 100);
-                waterline.style.width = `${percent}%`;
-                if (percent < 50) waterline.style.backgroundColor = '#3f3f46';
-                else if (percent < 85) waterline.style.backgroundColor = '#fbbf24';
-                else waterline.style.backgroundColor = '#ef4444';
-                budgetLabel.innerText = `${(budgetLimit - currentTotal).toLocaleString('hu-HU')} Ft Left`;
-            } else { waterline.style.width = '0%'; budgetLabel.innerText = "Set Budget"; }
-        }
-
-        function getComparisonData() {
-            let compareDayLimit = 31;
-            const now = new Date();
-            if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) compareDayLimit = now.getDate();
-            let prevMonthIdx = viewDate.getMonth() - 1; let prevYear = viewDate.getFullYear();
-            if (prevMonthIdx < 0) { prevMonthIdx = 11; prevYear -= 1; }
-            const prevExpenses = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === prevMonthIdx && d.getFullYear() === prevYear && d.getDate() <= compareDayLimit; });
-            const prevTotal = prevExpenses.reduce((sum, e) => sum + e.amount, 0);
-            return { prevTotal, prevExpenses };
-        }
-
-        function changeMonth(dir) { viewDate.setMonth(viewDate.getMonth() + dir); renderAll(); if(isSummaryMode) renderSummary(); }
-        function jumpToToday() { viewDate = new Date(); renderAll(); if(isSummaryMode) renderSummary(); }
-
-        function toggleView() {
-            isSummaryMode = !isSummaryMode;
-            document.getElementById('dot1').classList.toggle('active', !isSummaryMode);
-            document.getElementById('dot2').classList.toggle('active', isSummaryMode);
-            document.getElementById('inputSection').classList.toggle('hidden-grid', isSummaryMode);
-            document.getElementById('activityView').classList.toggle('hidden-grid', isSummaryMode);
-            document.getElementById('summaryView').classList.toggle('hidden-grid', !isSummaryMode);
-            if(isSummaryMode) renderSummary();
-        }
-
-        function renderAll() {
-            const list = document.getElementById('expenseList');
-            document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            
-            const filtered = expenses.map((e, i) => ({ ...e, originalIndex: i })).filter(e => { const d = new Date(e.date); return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear(); }).sort((a, b) => { if (b.date !== a.date) return b.date - a.date; return b.originalIndex - a.originalIndex; });
-
-            list.innerHTML = filtered.map((e) => {
-                const col = getColor(e.category);
-                const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
-                return `<li onclick="editItem(${e.originalIndex})" class="stack-item flex justify-between items-center" style="border-left: 4px solid ${col};">
-                    <div class="flex flex-col text-left">
-                        <span class="text-sm font-black uppercase tracking-tight">${e.category}</span>
-                        <span class="text-[9px] font-bold opacity-40 uppercase">${new Date(e.date).toLocaleDateString('hu-HU')}</span>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <span class="font-black text-md tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
-                        <button onclick="event.stopPropagation(); deleteEntry(${e.originalIndex})" class="text-2xl opacity-20 font-light px-2">×</button>
-                    </div>
-                </li>`;
-            }).join('');
-
-            const currentTotal = filtered.reduce((sum, e) => sum + e.amount, 0);
-            document.getElementById('totalDisplay').innerText = `${currentTotal.toLocaleString('hu-HU')} Ft`;
-            calculateMetrics(currentTotal);
-            localStorage.setItem('expenses', JSON.stringify(expenses));
-        }
-
-        function renderSummary() {
-            const list = document.getElementById('summaryList');
-            const totals = {}; let grand = 0;
-            const filtered = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear(); });
-            filtered.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; grand += e.amount; });
-            
-            const { prevExpenses } = getComparisonData();
-            const prevTotals = {}; prevExpenses.forEach(e => { prevTotals[e.category] = (prevTotals[e.category] || 0) + e.amount; });
-            const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-            
-            list.innerHTML = sorted.map(([cat, amt]) => {
-                const p = grand > 0 ? (amt / grand * 100).toFixed(0) : 0;
-                const col = getColor(cat);
-                const prevAmt = prevTotals[cat] || 0;
-                let pillHTML = "";
-                if (prevAmt > 0) {
-                    const diff = amt - prevAmt; const percent = ((diff / prevAmt) * 100).toFixed(0);
-                    if (diff < 0) pillHTML = `<span class="pill pill-good ml-2">↓ ${Math.abs(percent)}%</span>`;
-                    else if (diff > 0) pillHTML = `<span class="pill pill-bad ml-2">↑ ${Math.abs(percent)}%</span>`;
-                    else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
-                } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
-
-                return `<li class="stack-item">
-                    <div class="summary-fill" style="width: ${p}%; background-color: ${col};"></div>
-                    <div class="summary-content">
-                        <div class="flex items-center"><span class="text-sm font-black uppercase tracking-tight">${cat}</span>${pillHTML}</div>
-                        <span class="text-md font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
-                    </div>
-                </li>`;
-            }).join('');
-            
-            renderGraph();
-        }
-
-        function renderGraph() {
-            const svg = document.getElementById('spendingChart');
-            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
-            const dailyTotals = new Array(daysInMonth).fill(0);
-            const filtered = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear(); });
-            filtered.forEach(e => { const d = new Date(e.date).getDate(); dailyTotals[d-1] += e.amount; });
-            const maxVal = Math.max(...dailyTotals, 1);
-            const width = svg.clientWidth || 300; const height = svg.clientHeight || 150; const stepX = width / (daysInMonth - 1);
-            let points = ""; let areaPoints = `0,${height} `;
-            dailyTotals.forEach((val, i) => { const x = i * stepX; const y = height - ((val / maxVal) * (height * 0.8)); points += `${x},${y} `; areaPoints += `${x},${y} `; });
-            areaPoints += `${width},${height}`;
-            svg.innerHTML = `<defs><linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:white; stop-opacity:0.3" /><stop offset="100%" style="stop-color:white; stop-opacity:0" /></linearGradient></defs><polygon points="${areaPoints}" class="chart-area" /><polyline points="${points}" class="chart-line" />${dailyTotals.map((val, i) => { if(val > 0) { const x = i * stepX; const y = height - ((val / maxVal) * (height * 0.8)); return `<circle cx="${x}" cy="${y}" class="chart-point" />`; } return ''; }).join('')}`;
-        }
-
-        function deleteEntry(i) { if(confirm("Delete?")) { expenses.splice(i, 1); renderAll(); } }
-        function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
-        function clearAll() { if(confirm("Reset?")) { expenses = []; renderAll(); categoryUsage={}; localStorage.removeItem('categoryUsage');} }
-        function exportToCSV() {
+        // Global Actions
+        window.changeMonth = (d) => { viewDate.setMonth(viewDate.getMonth()+d); renderAll(); };
+        window.jumpToToday = () => { viewDate = new Date(); renderAll(); };
+        window.setBudget = () => { 
+            const n = prompt("Monthly Limit:", budgetLimit); 
+            if(n!==null) { budgetLimit = parseFloat(n); localStorage.setItem('budgetLimit', budgetLimit); renderAll(); }
+        };
+        window.addNewCategory = () => {
+            const n = prompt("New Category:");
+            if(n && !categories.includes(n)) { categories.push(n); localStorage.setItem('categories', JSON.stringify(categories)); renderCategories(); }
+        };
+        window.deleteItem = (i) => {
+            if(confirm("Delete item?")) { expenses.splice(i,1); renderAll(); }
+        };
+        window.clearAll = () => { if(confirm("Reset App?")) { localStorage.clear(); location.reload(); }};
+        window.exportToCSV = () => {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${new Date(e.date).toLocaleDateString()}","${e.category}",${e.amount}`).join("\n");
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `Report.csv`; a.click();
-        }
-        renderAll();
+            const blob = new Blob([csv],{type:'text/csv'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='data.csv'; a.click();
+        };
+
+        // Start
+        init();
     </script>
 </body>
 </html>

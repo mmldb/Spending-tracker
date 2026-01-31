@@ -8,110 +8,112 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        .app-container { flex: 1; display: flex; flex-direction: column; max-width: 28rem; margin: 0 auto; width: 100%; padding: 1.5rem; height: 100%; }
+        .app-container { flex: 1; display: flex; flex-direction: column; max-width: 28rem; margin: 0 auto; width: 100%; padding: 1rem; height: 100%; }
         
-        /* Stack Items */
+        /* Stack Items (History) - TIGHTER */
         .stack-item { border-radius: 0; margin-bottom: 0; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .stack-item:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
-        .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; border-bottom: none; }
+        .stack-item:first-child { border-top-left-radius: 16px; border-top-right-radius: 16px; }
+        .stack-item:last-child { border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; border-bottom: none; }
         
         /* Categories */
-        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; min-height: 45px; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; }
+        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; min-height: 40px; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; font-size: 10px; }
         .active-edit { border-color: #FFFFFF !important; background: #333333 !important; }
         
         /* Layout */
         .hidden-grid { display: none !important; }
         .full-screen-mode .hide-on-input { display: none !important; }
         .full-screen-mode #inputSection { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; height: 100%; }
-        .full-screen-mode #categoryGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; max-height: 300px; overflow-y: auto; flex-grow: 0; flex-shrink: 1; padding-bottom: 20px; scrollbar-width: none; }
-        .full-screen-mode #categoryGrid::-webkit-scrollbar { display: none; }
+        .full-screen-mode #categoryGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; max-height: 400px; overflow-y: auto; flex-grow: 1; padding-bottom: 20px; scrollbar-width: none; }
         
         /* Scroller */
-        .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+        .date-scroller { display: flex; overflow-x: auto; gap: 6px; padding: 4px 0; scroll-snap-type: x mandatory; }
         .date-scroller::-webkit-scrollbar { display: none; }
-        .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; position: relative; user-select: none; }
+        .date-card { scroll-snap-align: center; flex: 0 0 50px; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 8px; border: 1px solid #27272a; position: relative; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
-        .today-dot { position: absolute; bottom: 6px; width: 4px; height: 4px; background: currentColor; border-radius: 50%; opacity: 0.5; }
+        .today-dot { position: absolute; bottom: 4px; width: 3px; height: 3px; background: currentColor; border-radius: 50%; opacity: 0.5; }
         
-        /* Metrics */
-        .progress-bar { height: 10px; border-radius: 5px; background: #1c1c1e; overflow: hidden; margin-top: 12px; }
+        /* Metrics & Summary - COMPACT */
+        .progress-bar { height: 6px; border-radius: 3px; background: #1c1c1e; overflow: hidden; margin-top: 8px; }
         .progress-fill { height: 100%; transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
-        .waterline-container { height: 4px; width: 100%; background: #1c1c1e; border-radius: 2px; overflow: hidden; margin-top: 8px; position: relative; }
+        .waterline-container { height: 3px; width: 100%; background: #1c1c1e; border-radius: 2px; overflow: hidden; margin-top: 4px; position: relative; }
         .waterline-fill { height: 100%; background: #333; width: 0%; transition: width 0.5s ease-out; }
         
         /* Pills */
-        .pill { font-size: 9px; font-weight: 900; padding: 3px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; vertical-align: middle; }
+        .pill { font-size: 9px; font-weight: 900; padding: 2px 5px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; vertical-align: middle; }
         .pill-good { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
         .pill-bad { background: rgba(239, 68, 68, 0.2); color: #f87171; }
         .pill-neutral { background: rgba(255, 255, 255, 0.1); color: #a1a1aa; }
 
         /* Graph */
-        .chart-point { r: 3; fill: #1c1c1e; stroke: #fff; stroke-width: 2px; }
-        .chart-line { fill: none; stroke: #fff; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; }
+        .chart-point { r: 2; fill: #1c1c1e; stroke: #fff; stroke-width: 1.5px; }
+        .chart-line { fill: none; stroke: #fff; stroke-width: 1.5px; stroke-linecap: round; stroke-linejoin: round; }
         .chart-area { fill: url(#gradient); opacity: 0.3; }
         
         input::placeholder { color: #27272a; }
     </style>
 </head>
-<body class="font-sans">
+<body class="font-sans text-sm">
     <div class="app-container">
         
         <div id="mainHeader" class="hide-on-input">
-            <div class="flex justify-between items-center mb-4 px-1">
-                <div class="flex items-center gap-4">
-                     <button onclick="changeMonth(-1)" class="text-zinc-600 text-xl font-black"><<<</button>
-                     <span onclick="jumpToToday()" id="currentMonthLabel" class="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer">JANUARY 2026</span>
-                     <button onclick="changeMonth(1)" class="text-zinc-600 text-xl font-black">>>></button>
+            <div class="flex justify-between items-center mb-2 px-1">
+                <div class="flex items-center gap-2">
+                     <button onclick="changeMonth(-1)" class="text-zinc-600 text-lg font-black p-1"><<<</button>
+                     <span onclick="jumpToToday()" id="currentMonthLabel" class="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-400 cursor-pointer">JAN 2026</span>
+                     <button onclick="changeMonth(1)" class="text-zinc-600 text-lg font-black p-1">>>></button>
                 </div>
-                <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-800">Summary</button>
+                <button onclick="toggleView()" id="viewBtn" class="bg-zinc-900 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-800">Summary</button>
             </div>
 
-            <div class="mb-10 px-1 relative group">
+            <div class="mb-6 px-1 relative group">
                 <div class="flex items-baseline cursor-pointer" onclick="setBudget()">
-                    <h2 id="totalDisplay" class="text-5xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
+                    <h2 id="totalDisplay" class="text-4xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
                     <span id="comparisonPill" class="pill pill-neutral ml-2">--</span>
                 </div>
                 <div class="waterline-container"><div id="waterlineFill" class="waterline-fill"></div></div>
                 <div class="flex justify-between mt-1">
-                    <span id="budgetLabel" class="text-[9px] font-bold text-zinc-700 uppercase tracking-widest">Tap to set limit</span>
+                    <span id="budgetLabel" class="text-[8px] font-bold text-zinc-700 uppercase tracking-widest">Set limit</span>
                 </div>
             </div>
         </div>
 
-        <div id="inputSection" class="mb-12 relative flex flex-col">
-            <div id="editHeader" class="flex justify-between items-center mb-2 shrink-0">
-                <span class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Amount</span>
-                <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
+        <div id="inputSection" class="mb-6 relative flex flex-col shrink-0">
+            <div id="editHeader" class="flex justify-between items-center mb-1 shrink-0">
+                <span class="text-[9px] font-black uppercase tracking-widest text-zinc-700">Amount</span>
+                <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[9px] uppercase tracking-tighter hover:text-white">+ Cat</button>
             </div>
-            <input id="amount" type="text" inputmode="decimal" placeholder="0" class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-6 text-white shrink-0">
+            <input id="amount" type="text" inputmode="decimal" placeholder="0" class="w-full bg-transparent border-b border-zinc-900 py-2 text-5xl font-black outline-none focus:border-zinc-700 transition-colors mb-4 text-white shrink-0">
             <div id="dateLocationTop" class="shrink-0"></div>
-            <div id="categoryGrid" class="hidden-grid mb-4"></div>
-            <div id="dateLocationBottom" class="mt-auto shrink-0 pb-4"></div>
+            <div id="categoryGrid" class="hidden-grid mb-2"></div>
+            <div id="dateLocationBottom" class="mt-auto shrink-0 pb-2"></div>
         </div>
 
         <div id="dateSelector" class="hidden-grid">
-            <span class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-2">Select Date</span>
+            <span class="text-[8px] font-black text-zinc-600 uppercase tracking-widest block mb-1">Select Date</span>
             <div id="scroller" class="date-scroller mb-2"></div>
         </div>
 
         <div id="contentArea" class="hide-on-input flex-1 overflow-y-auto pb-6">
-            <div id="activityView"><ul id="expenseList" class="flex flex-col"></ul></div>
+            <div id="activityView">
+                <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-800 mb-2">Activity</h3>
+                <ul id="expenseList" class="flex flex-col"></ul>
+            </div>
             
             <div id="summaryView" class="hidden-grid">
-                <ul id="summaryList" class="space-y-6 mb-10"></ul>
+                <ul id="summaryList" class="space-y-2 mb-6"></ul>
                 
                 <div class="mb-4">
-                     <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700 mb-4">Spending Trend</h3>
-                     <div id="chartContainer" class="w-full h-40 bg-[#1c1c1e] rounded-2xl p-4 relative overflow-hidden flex items-end">
+                     <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-800 mb-2">Trend</h3>
+                     <div id="chartContainer" class="w-full h-32 bg-[#1c1c1e] rounded-xl p-3 relative overflow-hidden flex items-end">
                         <svg id="spendingChart" class="w-full h-full overflow-visible" preserveAspectRatio="none"></svg>
                      </div>
                 </div>
             </div>
         </div>
 
-        <div id="footerArea" class="mt-4 flex justify-between items-center opacity-10 hide-on-input shrink-0">
-            <button onclick="exportToCSV()" class="text-[9px] font-bold uppercase tracking-widest">CSV</button>
-            <button onclick="clearAll()" class="text-[9px] font-bold uppercase tracking-widest text-red-900">Reset</button>
+        <div id="footerArea" class="mt-2 flex justify-between items-center opacity-20 hide-on-input shrink-0">
+            <button onclick="exportToCSV()" class="text-[8px] font-bold uppercase tracking-widest">CSV</button>
+            <button onclick="clearAll()" class="text-[8px] font-bold uppercase tracking-widest text-red-900">Reset</button>
         </div>
     </div>
 
@@ -183,7 +185,7 @@
                 const col = getColor(c);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
                 const isEdit = currentEditIdx !== null && expenses[currentEditIdx].category === c;
-                return `<button onmousedown="startLongPress('${c}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress('${c}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()" onclick="saveTransaction('${c}')" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" class="category-chip rounded-xl text-[10px] font-black uppercase ${isEdit ? 'active-edit' : ''}">${c}</button>`;
+                return `<button onmousedown="startLongPress('${c}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress('${c}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()" onclick="saveTransaction('${c}')" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" class="category-chip rounded-lg text-[9px] font-black uppercase ${isEdit ? 'active-edit' : ''}">${c}</button>`;
             }).join('');
         }
 
@@ -198,14 +200,14 @@
                 const isSelected = ts === selectedTimestamp;
                 const isToday = ts === today;
                 html += `<div id="day-${i}" onclick="selectDate(${ts})" class="date-card ${isSelected ? 'selected' : ''}">
-                        <span class="text-[10px] font-bold uppercase">${dayName}</span>
-                        <span class="text-lg font-black">${i}</span>
+                        <span class="text-[9px] font-bold uppercase">${dayName}</span>
+                        <span class="text-sm font-black">${i}</span>
                         ${isToday ? '<div class="today-dot"></div>' : ''}
                     </div>`;
             }
             scroller.innerHTML = html;
             const selectedDay = new Date(selectedTimestamp).getDate();
-            const cardWidth = 68; const containerWidth = scroller.offsetWidth;
+            const cardWidth = 56; const containerWidth = scroller.offsetWidth;
             if (selectedDay <= 3) scroller.scrollLeft = 0;
             else if (selectedDay >= daysInMonth - 2) scroller.scrollLeft = scroller.scrollWidth;
             else scroller.scrollLeft = (selectedDay * cardWidth) - (containerWidth / 2) - (cardWidth / 2);
@@ -283,7 +285,6 @@
                 budgetLabel.innerText = "Set Budget";
             }
             
-            // Total Comparison Pill
             const { prevTotal } = getComparisonData();
             const pill = document.getElementById('comparisonPill');
             if (prevTotal > 0) {
@@ -338,7 +339,7 @@
 
         function renderAll() {
             const list = document.getElementById('expenseList');
-            document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'short', year: 'numeric' });
             
             const filtered = expenses
                 .map((e, i) => ({ ...e, originalIndex: i }))
@@ -351,14 +352,15 @@
             list.innerHTML = filtered.map((e) => {
                 const col = getColor(e.category);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
-                return `<li onclick="editItem(${e.originalIndex})" class="stack-item p-6 flex justify-between items-center" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
+                // TIGHT PADDING (p-3)
+                return `<li onclick="editItem(${e.originalIndex})" class="stack-item p-3 px-4 flex justify-between items-center" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
                     <div class="flex flex-col text-left">
-                        <span class="text-sm font-black uppercase tracking-tight">${e.category}</span>
-                        <span class="text-[9px] font-bold opacity-40 uppercase">${new Date(e.date).toLocaleDateString('hu-HU')}</span>
+                        <span class="text-xs font-black uppercase tracking-tight">${e.category}</span>
+                        <span class="text-[8px] font-bold opacity-40 uppercase">${new Date(e.date).toLocaleDateString('hu-HU')}</span>
                     </div>
-                    <div class="flex items-center gap-4">
-                        <span class="font-black text-md tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
-                        <button onclick="event.stopPropagation(); deleteEntry(${e.originalIndex})" class="text-2xl opacity-20 font-light px-2">×</button>
+                    <div class="flex items-center gap-3">
+                        <span class="font-black text-sm tabular-nums">${Number(e.amount).toLocaleString('hu-HU')} Ft</span>
+                        <button onclick="event.stopPropagation(); deleteEntry(${e.originalIndex})" class="text-lg opacity-20 font-light px-1">×</button>
                     </div>
                 </li>`;
             }).join('');
@@ -399,16 +401,16 @@
                     else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
                 } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
 
+                // TIGHT PADDING (p-3)
                 return `<li>
-                    <div class="flex justify-between items-center p-5 rounded-2xl" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
-                        <div class="flex items-center"><span class="text-sm font-black uppercase tracking-tight">${cat}</span>${pillHTML}</div>
-                        <span class="text-md font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
+                    <div class="flex justify-between items-center p-3 px-4 rounded-xl" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
+                        <div class="flex items-center"><span class="text-xs font-black uppercase tracking-tight">${cat}</span>${pillHTML}</div>
+                        <span class="text-sm font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
                     </div>
                     <div class="progress-bar"><div class="progress-fill" style="width: 0%; background:${col}" data-w="${p}"></div></div>
                 </li>`;
             }).join('');
             setTimeout(() => { document.querySelectorAll('.progress-fill').forEach(el => el.style.width = el.dataset.w + '%'); }, 50);
-
             renderGraph();
         }
 
@@ -431,7 +433,6 @@
             const height = svg.clientHeight || 150;
             const stepX = width / (daysInMonth - 1);
             
-            // Build Points
             let points = "";
             let areaPoints = `0,${height} `;
             
@@ -444,12 +445,7 @@
             areaPoints += `${width},${height}`;
 
             svg.innerHTML = `
-                <defs>
-                    <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" style="stop-color:white; stop-opacity:0.3" />
-                        <stop offset="100%" style="stop-color:white; stop-opacity:0" />
-                    </linearGradient>
-                </defs>
+                <defs><linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:white; stop-opacity:0.3" /><stop offset="100%" style="stop-color:white; stop-opacity:0" /></linearGradient></defs>
                 <polygon points="${areaPoints}" class="chart-area" />
                 <polyline points="${points}" class="chart-line" />
                 ${dailyTotals.map((val, i) => {

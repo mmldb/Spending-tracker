@@ -87,13 +87,23 @@
             display: flex; flex-direction: column;
         }
         .category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; flex: 1; overflow-y: auto; padding-bottom: 20px; }
+        
         .category-btn { 
-            background: #1c1c1e; border: 1px solid #27272a; 
+            background: #1c1c1e; border: 1px solid #27272a; color: #fff;
             border-radius: 16px; height: 60px; 
             font-weight: 800; font-size: 12px; text-transform: uppercase; 
             display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
         }
-        .category-btn:active { background: #333; border-color: #fff; }
+        .category-btn:active { transform: scale(0.98); }
+        
+        /* Highlighted Category in Edit Mode */
+        .category-btn.active-edit { 
+            background: #FFFFFF !important; 
+            color: #000000 !important; 
+            border-color: #FFFFFF !important;
+            box-shadow: 0 0 15px rgba(255,255,255,0.3);
+        }
 
         /* --- VISUALS --- */
         .pill { font-size: 10px; font-weight: 900; padding: 3px 6px; border-radius: 6px; text-transform: uppercase; }
@@ -183,10 +193,17 @@
             <span id="inputHeaderLabel" class="text-zinc-700 font-black text-xs uppercase tracking-widest">Add New</span>
             <button onclick="addNewCategory()" class="text-white font-bold text-xs uppercase tracking-widest">+ Cat</button>
         </div>
+        
         <input id="amountInput" type="text" inputmode="decimal" placeholder="0" 
-            class="w-full bg-transparent border-b-2 border-zinc-800 py-6 text-6xl font-black text-center outline-none focus:border-white transition-colors mb-8 text-white">
+            class="w-full bg-transparent border-b-2 border-zinc-800 py-6 text-6xl font-black text-center outline-none focus:border-white transition-colors mb-4 text-white">
+        
+        <div id="dateLocationTop" class="mb-4"></div>
+
         <div id="categoryGrid" class="category-grid mb-6"></div>
-        <div class="mt-auto">
+        
+        <div id="dateLocationBottom" class="mt-auto"></div>
+        
+        <div id="dateScrollerWrapper" class="hidden">
             <span class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest block mb-3 text-center">Select Date</span>
             <div id="dateScroller" class="date-scroller"></div>
         </div>
@@ -202,7 +219,7 @@
         
         let viewDate = new Date();
         let selectedTimestamp = new Date().setHours(12,0,0,0);
-        let currentEditIdx = null; // Track if editing
+        let currentEditIdx = null;
         let isSummaryMode = false;
 
         function init() { renderAll(); }
@@ -211,17 +228,24 @@
         function openInputMode(isNew = true) {
             document.getElementById('inputOverlay').classList.remove('hidden');
             
+            const scroller = document.getElementById('dateScrollerWrapper');
+            scroller.classList.remove('hidden');
+
             if(isNew) {
                 currentEditIdx = null;
                 document.getElementById('amountInput').value = '';
                 document.getElementById('inputHeaderLabel').innerText = "Add New";
                 syncSelectedDateToView();
+                // Move Date to Bottom
+                document.getElementById('dateLocationBottom').appendChild(scroller);
             } else {
                 document.getElementById('inputHeaderLabel').innerText = "Edit Entry";
+                // Move Date to Top (Edit Mode)
+                document.getElementById('dateLocationTop').appendChild(scroller);
             }
             
             document.getElementById('amountInput').focus();
-            renderCategories();
+            renderCategories(); // Will handle highlighting
             renderDateScroller();
         }
 
@@ -237,16 +261,8 @@
             const amt = parseFloat(raw);
             
             if (currentEditIdx !== null) {
-                // Edit existing
-                expenses[currentEditIdx] = { 
-                    ...expenses[currentEditIdx], 
-                    category: cat, 
-                    amount: amt, 
-                    date: selectedTimestamp,
-                    color: getColor(cat)
-                };
+                expenses[currentEditIdx] = { ...expenses[currentEditIdx], category: cat, amount: amt, date: selectedTimestamp, color: getColor(cat) };
             } else {
-                // Create new
                 expenses.push({ category: cat, amount: amt, date: selectedTimestamp, color: getColor(cat) });
             }
             
@@ -260,17 +276,14 @@
             currentEditIdx = idx;
             const item = expenses[idx];
             selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
-            
             document.getElementById('amountInput').value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
-            openInputMode(false); // Open in Edit Mode
+            openInputMode(false); 
         }
 
         function renderAll() {
             localStorage.setItem('expenses', JSON.stringify(expenses));
             document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-            // Sort & Filter
-            // We must map original index first so we can edit/delete the correct item
             const currentMonthData = expenses
                 .map((e, i) => ({ ...e, originalIndex: i }))
                 .filter(e => {
@@ -282,7 +295,6 @@
             const total = currentMonthData.reduce((sum, e) => sum + e.amount, 0);
             document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
 
-            // Activity List (Full Fill Cards)
             document.getElementById('expenseList').innerHTML = currentMonthData.map((e) => {
                 const col = getColor(e.category);
                 const isBright = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(col);
@@ -306,8 +318,23 @@
             if(isSummaryMode) renderSummaryList(currentMonthData, total);
         }
 
+        function renderCategories() {
+            const sorted = [...categories].sort((a,b) => (categoryUsage[b]||0) - (categoryUsage[a]||0));
+            
+            // Determine active category for highlighting
+            let activeCategory = null;
+            if(currentEditIdx !== null) {
+                activeCategory = expenses[currentEditIdx].category;
+            }
+
+            document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
+                const isActive = c === activeCategory;
+                return `<button onclick="saveTransaction('${c}')" class="category-btn ${isActive ? 'active-edit' : ''}">${c}</button>`;
+            }).join('');
+        }
+
+        // --- Standard Logic (Control Grid, Summary, Colors) ---
         function updateControlGrid(currentTotal) {
-            // Budget
             const budgetLabel = document.getElementById('budgetLeftLabel');
             const waterline = document.getElementById('waterlineFill');
             if (budgetLimit > 0) {
@@ -317,12 +344,8 @@
                 const pct = Math.min((currentTotal / budgetLimit) * 100, 100);
                 waterline.style.width = `${pct}%`;
                 waterline.style.backgroundColor = pct > 90 ? '#f87171' : '#FFFFFF';
-            } else {
-                budgetLabel.innerText = "TAP TO SET";
-                waterline.style.width = '0%';
-            }
+            } else { budgetLabel.innerText = "TAP TO SET"; waterline.style.width = '0%'; }
 
-            // Global Comparison
             const { prevTotal } = getComparisonData();
             const compContainer = document.getElementById('comparisonContainer');
             if (prevTotal > 0) {
@@ -335,93 +358,59 @@
         }
 
         function renderSummaryList(data, grandTotal) {
-            const totals = {};
-            data.forEach(e => totals[e.category] = (totals[e.category] || 0) + e.amount);
+            const totals = {}; data.forEach(e => totals[e.category] = (totals[e.category] || 0) + e.amount);
             const sorted = Object.entries(totals).sort((a,b) => b[1] - a[1]);
-
-            // Get Category specific comparison
             const { prevExpenses } = getComparisonData();
-            const prevTotals = {}; 
-            prevExpenses.forEach(e => prevTotals[e.category] = (prevTotals[e.category] || 0) + e.amount);
+            const prevTotals = {}; prevExpenses.forEach(e => prevTotals[e.category] = (prevTotals[e.category] || 0) + e.amount);
 
             document.getElementById('summaryList').innerHTML = sorted.map(([cat, amt]) => {
                 const col = getColor(cat);
                 const pct = grandTotal > 0 ? (amt / grandTotal * 100).toFixed(0) : 0;
-                
                 const prevAmt = prevTotals[cat] || 0;
                 let pillHTML = "";
                 if (prevAmt > 0) {
-                    const diff = amt - prevAmt;
-                    const p = ((diff / prevAmt) * 100).toFixed(0);
+                    const diff = amt - prevAmt; const p = ((diff / prevAmt) * 100).toFixed(0);
                     if (diff < 0) pillHTML = `<span class="pill pill-good ml-2">↓ ${Math.abs(p)}%</span>`;
                     else if (diff > 0) pillHTML = `<span class="pill pill-bad ml-2">↑ ${Math.abs(p)}%</span>`;
                     else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
                 } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
 
-                return `
-                <li class="stack-item" style="background: #000; border-color: #333;">
+                return `<li class="stack-item" style="background: #000; border-color: #333;">
                     <div class="summary-fill" style="width: 0%; background-color: ${col};" data-width="${pct}%"></div>
                     <div class="item-content">
-                        <div class="flex items-center">
-                            <span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span>
-                            ${pillHTML}
-                        </div>
+                        <div class="flex items-center"><span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span>${pillHTML}</div>
                         <span class="text-md font-black tabular-nums">${Math.round(amt).toLocaleString('hu-HU')} Ft</span>
                     </div>
                 </li>`;
             }).join('');
-            
-            setTimeout(() => {
-                document.querySelectorAll('.summary-fill').forEach(el => el.style.width = el.getAttribute('data-width'));
-            }, 50);
-
+            setTimeout(() => { document.querySelectorAll('.summary-fill').forEach(el => el.style.width = el.getAttribute('data-width')); }, 50);
             renderGraph(data);
         }
 
-        // --- UTILS ---
         function toggleView() {
             isSummaryMode = !isSummaryMode;
             const grid = document.getElementById('controlGrid');
             const act = document.getElementById('activityView');
             const sum = document.getElementById('summaryView');
-            
             if (isSummaryMode) {
-                grid.classList.add('hidden');
-                act.classList.add('hidden');
-                sum.classList.remove('hidden');
-                // Trigger summary calculation
+                grid.classList.add('hidden'); act.classList.add('hidden'); sum.classList.remove('hidden');
                 const data = expenses.filter(e => new Date(e.date).getMonth() === viewDate.getMonth() && new Date(e.date).getFullYear() === viewDate.getFullYear());
-                const total = data.reduce((s,e) => s+e.amount,0);
-                renderSummaryList(data, total);
-            } else {
-                grid.classList.remove('hidden');
-                act.classList.remove('hidden');
-                sum.classList.add('hidden');
-            }
+                renderSummaryList(data, data.reduce((s,e) => s+e.amount,0));
+            } else { grid.classList.remove('hidden'); act.classList.remove('hidden'); sum.classList.add('hidden'); }
         }
 
         function getComparisonData() {
-            let compareDayLimit = 31;
-            const now = new Date();
+            let compareDayLimit = 31; const now = new Date();
             if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) compareDayLimit = now.getDate();
-            
-            let prevMonthIdx = viewDate.getMonth() - 1; 
-            let prevYear = viewDate.getFullYear();
+            let prevMonthIdx = viewDate.getMonth() - 1; let prevYear = viewDate.getFullYear();
             if (prevMonthIdx < 0) { prevMonthIdx = 11; prevYear -= 1; }
-
-            const prevExpenses = expenses.filter(e => {
-                const d = new Date(e.date);
-                return d.getMonth() === prevMonthIdx && d.getFullYear() === prevYear && d.getDate() <= compareDayLimit;
-            });
+            const prevExpenses = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === prevMonthIdx && d.getFullYear() === prevYear && d.getDate() <= compareDayLimit; });
             const prevTotal = prevExpenses.reduce((sum, e) => sum + e.amount, 0);
             return { prevTotal, prevExpenses };
         }
 
         function getColor(cat) {
-            if(!categoryColors[cat]) {
-                categoryColors[cat] = PALETTE[Object.keys(categoryColors).length % PALETTE.length];
-                localStorage.setItem('categoryColors', JSON.stringify(categoryColors));
-            }
+            if(!categoryColors[cat]) { categoryColors[cat] = PALETTE[Object.keys(categoryColors).length % PALETTE.length]; localStorage.setItem('categoryColors', JSON.stringify(categoryColors)); }
             return categoryColors[cat];
         }
 
@@ -431,30 +420,16 @@
             else selectedTimestamp = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).setHours(12,0,0,0);
         }
 
-        function renderCategories() {
-            const sorted = [...categories].sort((a,b) => (categoryUsage[b]||0) - (categoryUsage[a]||0));
-            document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
-                return `<button onclick="saveTransaction('${c}')" class="category-btn text-white uppercase">${c}</button>`;
-            }).join('');
-        }
-
         function renderDateScroller() {
             const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
             let html = '';
             for(let i=1; i<=daysInMonth; i++) {
                 const ts = new Date(viewDate.getFullYear(), viewDate.getMonth(), i).setHours(12,0,0,0);
                 const isSel = ts === selectedTimestamp;
-                html += `<div onclick="selectedTimestamp=${ts}; renderDateScroller()" class="date-card ${isSel?'selected':''}">
-                    <span class="text-[9px] font-bold uppercase">DAY</span>
-                    <span class="text-lg font-black">${i}</span>
-                </div>`;
+                html += `<div onclick="selectedTimestamp=${ts}; renderDateScroller()" class="date-card ${isSel?'selected':''}"><span class="text-[9px] font-bold uppercase">DAY</span><span class="text-lg font-black">${i}</span></div>`;
             }
             document.getElementById('dateScroller').innerHTML = html;
-            // Scroll to selected
-            setTimeout(() => {
-                const sel = document.querySelector('.date-card.selected');
-                if(sel) sel.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            }, 10);
+            setTimeout(() => { const sel = document.querySelector('.date-card.selected'); if(sel) sel.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }, 10);
         }
 
         function renderGraph(data) {
@@ -462,9 +437,7 @@
             const daily = new Array(days).fill(0);
             data.forEach(e => daily[new Date(e.date).getDate()-1] += e.amount);
             const max = Math.max(...daily, 10);
-            const svg = document.getElementById('spendingChart');
-            const w = svg.clientWidth || 300; const h = 128;
-            const step = w / (days-1);
+            const svg = document.getElementById('spendingChart'); const w = svg.clientWidth || 300; const h = 128; const step = w / (days-1);
             let pts = ""; let area = `0,${h} `;
             daily.forEach((val, i) => { const x = i * step; const y = h - ((val/max) * (h*0.8)); pts += `${x},${y} `; area += `${x},${y} `; });
             area += `${w},${h}`;

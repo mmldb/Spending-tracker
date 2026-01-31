@@ -8,19 +8,28 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; }
-        .stack-item { border-radius: 0; margin-bottom: 0; border: none; border-bottom: 1px solid rgba(0,0,0,0.1); }
+        
+        /* Solid Stack */
+        .stack-item { border-radius: 0; margin-bottom: 0; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .stack-item:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
         .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; border-bottom: none; }
+        
         .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; }
         .active-edit { border-color: #FFFFFF !important; background: #333333 !important; }
         .hidden-grid { display: none !important; }
         
-        /* iOS Style Date Scroller */
+        /* Scroller */
         .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
         .date-scroller::-webkit-scrollbar { display: none; }
         .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; position: relative; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
         .today-dot { position: absolute; bottom: 6px; width: 4px; height: 4px; background: currentColor; border-radius: 50%; opacity: 0.5; }
+        
+        /* Summary Bars */
+        .progress-bar { height: 10px; border-radius: 5px; background: #1c1c1e; overflow: hidden; margin-top: 12px; }
+        .progress-fill { height: 100%; transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
+        
+        input::placeholder { color: #27272a; }
     </style>
 </head>
 <body class="p-6">
@@ -46,12 +55,16 @@
             <input id="amount" type="text" inputmode="decimal" placeholder="0" 
                 class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-6 text-white">
             
-            <div id="dateSelector" class="hidden-grid">
-                <span class="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Select Date</span>
-                <div id="scroller" class="date-scroller mb-6"></div>
-            </div>
+            <div id="dateLocationTop"></div>
 
-            <div id="categoryGrid" class="grid grid-cols-3 gap-1 hidden-grid"></div>
+            <div id="categoryGrid" class="grid grid-cols-3 gap-1 hidden-grid mb-6"></div>
+
+            <div id="dateLocationBottom"></div>
+        </div>
+
+        <div id="dateSelector" class="hidden-grid">
+            <span class="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-2">Select Date</span>
+            <div id="scroller" class="date-scroller mb-6"></div>
         </div>
 
         <div id="activityView">
@@ -72,14 +85,15 @@
         const PALETTE = ['#1c1c1e', '#2c2c2e', '#3a3a3c', '#48484a', '#636366', '#8e8e93', '#c7c7cc', '#F8F8F2'];
         let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
         let categories = JSON.parse(localStorage.getItem('categories')) || ['Rent', 'Food', 'Health', 'Tech', 'Travel', 'Aldi'];
-        // Ensure categoryUsage is an object
-        let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage'));
-        if (!categoryUsage || Array.isArray(categoryUsage)) { categoryUsage = {}; }
+        // Fix for potential null usage stats
+        let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
+        if (Array.isArray(categoryUsage)) categoryUsage = {};
 
         let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
         let viewDate = new Date();
         let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditIdx = null;
+        let isSummaryMode = false;
 
         function getColor(cat) {
             if (!categoryColors[cat]) {
@@ -91,17 +105,26 @@
 
         const amountInput = document.getElementById('amount');
         const scroller = document.getElementById('scroller');
+        const dateSelector = document.getElementById('dateSelector');
 
         amountInput.addEventListener('input', (e) => {
             let val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
             if (val.length > 0) {
                 e.target.value = Number(val).toLocaleString('hu-HU').replace(/,/g, ' ');
+                
+                // Show grid
                 document.getElementById('categoryGrid').classList.remove('hidden-grid');
-                document.getElementById('dateSelector').classList.remove('hidden-grid');
+                
+                // NEW ENTRY MODE: Move Date to Bottom
+                if (currentEditIdx === null) {
+                    document.getElementById('dateLocationBottom').appendChild(dateSelector);
+                }
+                dateSelector.classList.remove('hidden-grid');
+                
                 renderDateScroller();
-                renderCategories(); // Re-sort and render every time input is active
+                renderCategories();
             } else {
-                resetInput();
+                if (currentEditIdx === null) resetInput();
             }
         });
 
@@ -118,7 +141,7 @@
                 const isToday = ts === today;
                 
                 html += `
-                    <div id="day-${i}" onclick="selectDate(${ts}, ${i})" class="date-card ${isSelected ? 'selected' : ''}">
+                    <div id="day-${i}" onclick="selectDate(${ts})" class="date-card ${isSelected ? 'selected' : ''}">
                         <span class="text-[10px] font-bold uppercase">${dayName}</span>
                         <span class="text-lg font-black">${i}</span>
                         ${isToday ? '<div class="today-dot"></div>' : ''}
@@ -127,32 +150,24 @@
             }
             scroller.innerHTML = html;
             
-            // Alignment Logic
+            // Align
             const selectedDay = new Date(selectedTimestamp).getDate();
             const cardWidth = 68; 
             const containerWidth = scroller.offsetWidth;
             
-            if (selectedDay <= 3) {
-                scroller.scrollLeft = 0;
-            } else if (selectedDay >= daysInMonth - 2) {
-                scroller.scrollLeft = scroller.scrollWidth;
-            } else {
-                scroller.scrollLeft = (selectedDay * cardWidth) - (containerWidth / 2) - (cardWidth / 2);
-            }
+            if (selectedDay <= 3) scroller.scrollLeft = 0;
+            else if (selectedDay >= daysInMonth - 2) scroller.scrollLeft = scroller.scrollWidth;
+            else scroller.scrollLeft = (selectedDay * cardWidth) - (containerWidth / 2) - (cardWidth / 2);
         }
 
-        function selectDate(ts, day) {
+        function selectDate(ts) {
             selectedTimestamp = ts;
             renderDateScroller();
         }
 
         function renderCategories() {
-            // STRICT SORTING LOGIC: Higher usage comes first
-            const sorted = [...categories].sort((a, b) => {
-                const usageA = categoryUsage[a] || 0;
-                const usageB = categoryUsage[b] || 0;
-                return usageB - usageA; // Descending: Largest number first
-            });
+            // Sort Descending Usage
+            const sorted = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
 
             document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
                 const col = getColor(c);
@@ -172,7 +187,6 @@
                 expenses.push({ category: cat, amount: parseFloat(raw), date: selectedTimestamp, color: getColor(cat) });
             }
             
-            // Increment usage immediately
             categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
             localStorage.setItem('categoryUsage', JSON.stringify(categoryUsage));
             
@@ -183,7 +197,7 @@
         function resetInput() {
             amountInput.value = '';
             document.getElementById('categoryGrid').classList.add('hidden-grid');
-            document.getElementById('dateSelector').classList.add('hidden-grid');
+            dateSelector.classList.add('hidden-grid');
             currentEditIdx = null;
             selectedTimestamp = new Date().setHours(12,0,0,0);
         }
@@ -194,16 +208,29 @@
             selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
             amountInput.value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
             
+            // EDIT MODE: Move Date to Top (Under Input)
+            document.getElementById('dateLocationTop').appendChild(dateSelector);
+            
             document.getElementById('categoryGrid').classList.remove('hidden-grid');
-            document.getElementById('dateSelector').classList.remove('hidden-grid');
+            dateSelector.classList.remove('hidden-grid');
+            
             renderDateScroller();
-            renderCategories(); // This will show sorted categories
+            renderCategories();
             amountInput.focus();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        function changeMonth(dir) { viewDate.setMonth(viewDate.getMonth() + dir); renderAll(); }
-        function jumpToToday() { viewDate = new Date(); renderAll(); }
+        function changeMonth(dir) { viewDate.setMonth(viewDate.getMonth() + dir); renderAll(); if(isSummaryMode) renderSummary(); }
+        function jumpToToday() { viewDate = new Date(); renderAll(); if(isSummaryMode) renderSummary(); }
+
+        function toggleView() {
+            isSummaryMode = !isSummaryMode;
+            document.getElementById('inputSection').classList.toggle('hidden-grid', isSummaryMode);
+            document.getElementById('activityView').classList.toggle('hidden-grid', isSummaryMode);
+            document.getElementById('summaryView').classList.toggle('hidden-grid', !isSummaryMode);
+            document.getElementById('viewBtn').innerText = isSummaryMode ? "Activity" : "Summary";
+            if(isSummaryMode) renderSummary();
+        }
 
         function renderAll() {
             const list = document.getElementById('expenseList');
@@ -236,17 +263,33 @@
             localStorage.setItem('expenses', JSON.stringify(expenses));
         }
 
-        function deleteEntry(i) { if(confirm("Delete?")) { expenses.splice(i, 1); renderAll(); } }
-        function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
-        function clearAll() { if(confirm("Reset?")) { expenses = []; renderAll(); categoryUsage = {}; localStorage.removeItem('categoryUsage'); } }
-        
-        function toggleView() {
-            const isVis = document.getElementById('summaryView').classList.toggle('hidden-grid');
-            document.getElementById('inputSection').classList.toggle('hidden-grid', !isVis);
-            document.getElementById('activityView').classList.toggle('hidden-grid', !isVis);
-            document.getElementById('viewBtn').innerText = !isVis ? "Activity" : "Summary";
+        function renderSummary() {
+            const list = document.getElementById('summaryList');
+            const totals = {}; let grand = 0;
+            const filtered = expenses.filter(e => {
+                const d = new Date(e.date);
+                return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
+            });
+            filtered.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; grand += e.amount; });
+            const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+            list.innerHTML = sorted.map(([cat, amt]) => {
+                const p = grand > 0 ? (amt / grand * 100).toFixed(0) : 0;
+                const col = getColor(cat);
+                const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
+                return `<li>
+                    <div class="flex justify-between items-center p-5 rounded-2xl" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
+                        <span class="text-sm font-black uppercase tracking-tight">${cat}</span>
+                        <span class="text-md font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
+                    </div>
+                    <div class="progress-bar"><div class="progress-fill" style="width: 0%; background:${col}" data-w="${p}"></div></div>
+                </li>`;
+            }).join('');
+            setTimeout(() => { document.querySelectorAll('.progress-fill').forEach(el => el.style.width = el.dataset.w + '%'); }, 50);
         }
 
+        function deleteEntry(i) { if(confirm("Delete?")) { expenses.splice(i, 1); renderAll(); } }
+        function addNewCategory() { const n = prompt("Name:"); if(n && !categories.includes(n)) { categories.push(n); renderCategories(); } }
+        function clearAll() { if(confirm("Reset?")) { expenses = []; renderAll(); categoryUsage={}; localStorage.removeItem('categoryUsage');} }
         function exportToCSV() {
             let csv = "Date,Category,Amount\n" + expenses.map(e => `"${new Date(e.date).toLocaleDateString()}","${e.category}",${e.amount}`).join("\n");
             const blob = new Blob([csv], { type: 'text/csv' });

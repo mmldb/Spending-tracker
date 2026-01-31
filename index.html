@@ -17,8 +17,18 @@
         .stack-item:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
         .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; border-bottom: none; }
         
-        /* Categories */
-        .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; min-height: 80px; user-select: none; -webkit-user-select: none; }
+        /* Categories - COMPACT & TIGHT */
+        .category-chip { 
+            transition: all 0.2s; 
+            border: 1px solid #27272a; 
+            font-weight: 800; 
+            min-height: 45px; /* Reduced Height */
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            user-select: none; 
+            -webkit-user-select: none; 
+        }
         .active-edit { border-color: #FFFFFF !important; background: #333333 !important; }
         
         /* Visibility States */
@@ -30,14 +40,12 @@
         .full-screen-mode #categoryGrid { 
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 0.5rem;
-            /* Height for roughly 4 rows (80px height + gap) */
-            max-height: 360px; 
+            gap: 4px; /* TIGHT GAP */
+            max-height: 300px; 
             overflow-y: auto;
-            flex-grow: 0; /* Don't grow infinitely */
-            flex-shrink: 1; /* Allow shrinking if screen is small */
+            flex-grow: 0; 
+            flex-shrink: 1; 
             padding-bottom: 20px;
-            /* Hide Scrollbar */
             scrollbar-width: none; 
             -ms-overflow-style: none;
         }
@@ -121,7 +129,7 @@
         let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditIdx = null;
         let isSummaryMode = false;
-        let longPressTimer; // Timer for deletion
+        let longPressTimer;
 
         function getColor(cat) {
             if (!categoryColors[cat]) {
@@ -155,7 +163,6 @@
             }
         });
 
-        // LONG PRESS LOGIC
         function startLongPress(cat) {
             longPressTimer = setTimeout(() => {
                 if(confirm(`Delete category "${cat}" permanently?`)) {
@@ -165,9 +172,7 @@
             }, 800);
         }
 
-        function cancelLongPress() {
-            clearTimeout(longPressTimer);
-        }
+        function cancelLongPress() { clearTimeout(longPressTimer); }
 
         function renderCategories() {
             const sorted = [...categories].sort((a, b) => (categoryUsage[b] || 0) - (categoryUsage[a] || 0));
@@ -177,7 +182,6 @@
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
                 const isEdit = currentEditIdx !== null && expenses[currentEditIdx].category === c;
                 
-                // Add touch/mouse listeners for long press
                 return `
                 <button 
                     onmousedown="startLongPress('${c}')" 
@@ -188,7 +192,7 @@
                     ontouchmove="cancelLongPress()"
                     onclick="saveTransaction('${c}')" 
                     style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" 
-                    class="category-chip rounded-xl text-[11px] font-black uppercase ${isEdit ? 'active-edit' : ''}">
+                    class="category-chip rounded-xl text-[10px] font-black uppercase ${isEdit ? 'active-edit' : ''}">
                     ${c}
                 </button>`;
             }).join('');

@@ -8,11 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #000000; color: #FFFFFF; -webkit-tap-highlight-color: transparent; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        
-        /* Layout Utilities */
         .app-container { flex: 1; display: flex; flex-direction: column; max-width: 28rem; margin: 0 auto; width: 100%; padding: 1.5rem; height: 100%; }
         
-        /* Solid Stack */
+        /* Stack Items */
         .stack-item { border-radius: 0; margin-bottom: 0; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .stack-item:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
         .stack-item:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; border-bottom: none; }
@@ -21,39 +19,31 @@
         .category-chip { transition: all 0.2s; border: 1px solid #27272a; font-weight: 800; min-height: 45px; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; }
         .active-edit { border-color: #FFFFFF !important; background: #333333 !important; }
         
-        /* Visibility */
+        /* Layout */
         .hidden-grid { display: none !important; }
         .full-screen-mode .hide-on-input { display: none !important; }
         .full-screen-mode #inputSection { flex: 1; display: flex; flex-direction: column; margin-bottom: 0; height: 100%; }
-        
-        /* Grid & Scroller */
-        .full-screen-mode #categoryGrid { 
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; 
-            max-height: 300px; overflow-y: auto; flex-grow: 0; flex-shrink: 1; 
-            padding-bottom: 20px; scrollbar-width: none; 
-        }
+        .full-screen-mode #categoryGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; max-height: 300px; overflow-y: auto; flex-grow: 0; flex-shrink: 1; padding-bottom: 20px; scrollbar-width: none; }
         .full-screen-mode #categoryGrid::-webkit-scrollbar { display: none; }
         
+        /* Scroller */
         .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
         .date-scroller::-webkit-scrollbar { display: none; }
         .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; position: relative; user-select: none; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
         .today-dot { position: absolute; bottom: 6px; width: 4px; height: 4px; background: currentColor; border-radius: 50%; opacity: 0.5; }
         
-        /* Summary & Waterline */
+        /* Metrics */
         .progress-bar { height: 10px; border-radius: 5px; background: #1c1c1e; overflow: hidden; margin-top: 12px; }
         .progress-fill { height: 100%; transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
-        
-        /* The Waterline (Budget Bar) */
         .waterline-container { height: 4px; width: 100%; background: #1c1c1e; border-radius: 2px; overflow: hidden; margin-top: 8px; position: relative; }
         .waterline-fill { height: 100%; background: #333; width: 0%; transition: width 0.5s ease-out; }
         
-        /* Comparison Pill */
         .pill { font-size: 10px; font-weight: 900; padding: 4px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; margin-left: 8px; vertical-align: middle; }
-        .pill-good { background: rgba(34, 197, 94, 0.2); color: #4ade80; } /* Green */
-        .pill-bad { background: rgba(239, 68, 68, 0.2); color: #f87171; } /* Red */
+        .pill-good { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .pill-bad { background: rgba(239, 68, 68, 0.2); color: #f87171; }
         .pill-neutral { background: #27272a; color: #71717a; }
-
+        
         input::placeholder { color: #27272a; }
     </style>
 </head>
@@ -75,12 +65,9 @@
                     <h2 id="totalDisplay" class="text-5xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
                     <span id="comparisonPill" class="pill pill-neutral">--</span>
                 </div>
-                <div class="waterline-container">
-                    <div id="waterlineFill" class="waterline-fill"></div>
-                </div>
+                <div class="waterline-container"><div id="waterlineFill" class="waterline-fill"></div></div>
                 <div class="flex justify-between mt-1">
                     <span id="budgetLabel" class="text-[9px] font-bold text-zinc-700 uppercase tracking-widest">Tap to set limit</span>
-                    <span id="overallPill" class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest"></span>
                 </div>
             </div>
         </div>
@@ -90,10 +77,7 @@
                 <span class="text-[10px] font-black uppercase tracking-widest text-zinc-700">Amount</span>
                 <button onclick="addNewCategory()" class="text-zinc-600 font-bold text-[10px] uppercase tracking-tighter hover:text-white">+ Category</button>
             </div>
-            
-            <input id="amount" type="text" inputmode="decimal" placeholder="0" 
-                class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-6 text-white shrink-0">
-            
+            <input id="amount" type="text" inputmode="decimal" placeholder="0" class="w-full bg-transparent border-b-2 border-zinc-900 py-6 text-6xl font-black outline-none focus:border-zinc-700 transition-colors mb-6 text-white shrink-0">
             <div id="dateLocationTop" class="shrink-0"></div>
             <div id="categoryGrid" class="hidden-grid mb-4"></div>
             <div id="dateLocationBottom" class="mt-auto shrink-0 pb-4"></div>
@@ -105,12 +89,8 @@
         </div>
 
         <div id="contentArea" class="hide-on-input flex-1 overflow-y-auto">
-            <div id="activityView">
-                <ul id="expenseList" class="flex flex-col"></ul>
-            </div>
-            <div id="summaryView" class="hidden-grid">
-                <ul id="summaryList" class="space-y-6"></ul>
-            </div>
+            <div id="activityView"><ul id="expenseList" class="flex flex-col"></ul></div>
+            <div id="summaryView" class="hidden-grid"><ul id="summaryList" class="space-y-6"></ul></div>
         </div>
 
         <div id="footerArea" class="mt-4 flex justify-between items-center opacity-10 hide-on-input shrink-0">
@@ -126,10 +106,9 @@
         let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
         if (Array.isArray(categoryUsage)) categoryUsage = {};
         let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
-        
         let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 0;
         
-        let viewDate = new Date();
+        let viewDate = new Date(); // Current View Month
         let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditIdx = null;
         let isSummaryMode = false;
@@ -147,11 +126,17 @@
         const scroller = document.getElementById('scroller');
         const dateSelector = document.getElementById('dateSelector');
 
+        // Ensure selectedTimestamp aligns with viewDate when we start typing
         amountInput.addEventListener('input', (e) => {
             let val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/g, '');
             if (val.length > 0) {
                 e.target.value = Number(val).toLocaleString('hu-HU').replace(/,/g, ' ');
                 document.body.classList.add('full-screen-mode');
+                
+                // --- FIX: Sync Date to View ---
+                syncSelectedDateToView();
+                // ------------------------------
+
                 document.getElementById('categoryGrid').classList.remove('hidden-grid');
                 if (currentEditIdx === null) document.getElementById('dateLocationBottom').appendChild(dateSelector);
                 dateSelector.classList.remove('hidden-grid');
@@ -161,6 +146,16 @@
                 if (currentEditIdx === null) resetInput();
             }
         });
+
+        // Helper: If we are viewing Dec 2025, default input should be Dec 2025
+        function syncSelectedDateToView() {
+            const currentSel = new Date(selectedTimestamp);
+            if(currentSel.getMonth() !== viewDate.getMonth() || currentSel.getFullYear() !== viewDate.getFullYear()) {
+                const today = new Date();
+                const targetDay = (today.getMonth() === viewDate.getMonth()) ? today.getDate() : 1; 
+                selectedTimestamp = new Date(viewDate.getFullYear(), viewDate.getMonth(), targetDay).setHours(12,0,0,0);
+            }
+        }
 
         function startLongPress(cat) {
             longPressTimer = setTimeout(() => {
@@ -178,15 +173,7 @@
                 const col = getColor(c);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
                 const isEdit = currentEditIdx !== null && expenses[currentEditIdx].category === c;
-                return `
-                <button 
-                    onmousedown="startLongPress('${c}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()"
-                    ontouchstart="startLongPress('${c}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()"
-                    onclick="saveTransaction('${c}')" 
-                    style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" 
-                    class="category-chip rounded-xl text-[10px] font-black uppercase ${isEdit ? 'active-edit' : ''}">
-                    ${c}
-                </button>`;
+                return `<button onmousedown="startLongPress('${c}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress('${c}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()" onclick="saveTransaction('${c}')" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}" class="category-chip rounded-xl text-[10px] font-black uppercase ${isEdit ? 'active-edit' : ''}">${c}</button>`;
             }).join('');
         }
 
@@ -236,23 +223,21 @@
             document.getElementById('categoryGrid').classList.add('hidden-grid');
             dateSelector.classList.add('hidden-grid');
             currentEditIdx = null;
+            // IMPORTANT: Reset timestamp logic for clean slate, but will sync to view on type
             selectedTimestamp = new Date().setHours(12,0,0,0);
         }
 
         function editItem(idx) {
-            // Logic to find item in sorted/filtered view vs main array
+            // Find corrected index from filtered view
             const filtered = expenses
                 .map((e, i) => ({...e, originalIndex: i}))
                 .filter(e => {
                     const d = new Date(e.date);
                     return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
                 })
-                .sort((a, b) => {
-                    if (b.date !== a.date) return b.date - a.date;
-                    return b.originalIndex - a.originalIndex;
-                });
+                .sort((a, b) => { if (b.date !== a.date) return b.date - a.date; return b.originalIndex - a.originalIndex; });
             
-            // Map the filtered index back to the real index
+            // Note: In renderAll we pass e.originalIndex, so 'idx' is correct
             currentEditIdx = idx;
             const item = expenses[idx];
             selectedTimestamp = new Date(item.date).setHours(12,0,0,0);
@@ -277,40 +262,46 @@
         }
 
         function calculateMetrics(currentTotal) {
-            // 1. Waterline
+            // Waterline
             const waterline = document.getElementById('waterlineFill');
             const budgetLabel = document.getElementById('budgetLabel');
-            
             if (budgetLimit > 0) {
                 const percent = Math.min((currentTotal / budgetLimit) * 100, 100);
                 waterline.style.width = `${percent}%`;
-                
-                if (percent < 50) waterline.style.backgroundColor = '#3f3f46'; // zinc-700
-                else if (percent < 85) waterline.style.backgroundColor = '#fbbf24'; // amber-400
-                else waterline.style.backgroundColor = '#ef4444'; // red-500
-                
+                if (percent < 50) waterline.style.backgroundColor = '#3f3f46';
+                else if (percent < 85) waterline.style.backgroundColor = '#fbbf24';
+                else waterline.style.backgroundColor = '#ef4444';
                 budgetLabel.innerText = `${(budgetLimit - currentTotal).toLocaleString('hu-HU')} Ft Left`;
             } else {
                 waterline.style.width = '0%';
                 budgetLabel.innerText = "Set Budget";
             }
 
-            // 2. Comparison Pill (Strict Month-to-Date)
-            const todayDay = new Date().getDate(); // e.g. 15
-            const currentMonthIdx = viewDate.getMonth();
-            const currentYear = viewDate.getFullYear();
+            // Comparison Pill (MTD)
+            // Use today's day number. If today is Jan 15, we compare vs PrevMonth 1st-15th.
+            const todayDay = new Date().getDate(); 
+            // Handle edge case: if we are viewing a past month (e.g. Dec), do we compare to Nov?
+            // Yes, let's compare ViewMonth vs PreviousMonth (up to same day count)
+            // But if ViewMonth is FULL (past), we should compare to full PrevMonth?
+            // Let's stick to strict MTD logic based on ViewDate.
+            
+            // Logic: Compare ViewMonth (up to today's day count if it's current month, or full if past?)
+            // Simplest effective logic: Compare ViewMonth Total vs PrevMonth Total (Same Day Count)
+            
+            let compareDayLimit = 31;
+            const now = new Date();
+            // If viewing current month, limit to today. If viewing past, limit to full month (31).
+            if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) {
+                compareDayLimit = now.getDate();
+            }
 
-            // Previous Month Total (up to the same day)
-            // Handle January roll-back
-            let prevMonthIdx = currentMonthIdx - 1;
-            let prevYear = currentYear;
-            if (prevMonthIdx < 0) { prevMonthIdx = 11; prevYear = currentYear - 1; }
+            let prevMonthIdx = viewDate.getMonth() - 1;
+            let prevYear = viewDate.getFullYear();
+            if (prevMonthIdx < 0) { prevMonthIdx = 11; prevYear -= 1; }
 
             const prevMonthTotal = expenses.filter(e => {
                 const d = new Date(e.date);
-                return d.getMonth() === prevMonthIdx && 
-                       d.getFullYear() === prevYear && 
-                       d.getDate() <= todayDay; // IMPORTANT: Only up to the same day
+                return d.getMonth() === prevMonthIdx && d.getFullYear() === prevYear && d.getDate() <= compareDayLimit;
             }).reduce((sum, e) => sum + e.amount, 0);
 
             const pill = document.getElementById('comparisonPill');
@@ -318,32 +309,19 @@
             if (prevMonthTotal > 0) {
                 const diff = currentTotal - prevMonthTotal;
                 const percentDiff = ((diff / prevMonthTotal) * 100).toFixed(0);
-                
-                if (diff < 0) {
-                    pill.className = "pill pill-good";
-                    pill.innerText = `↓ ${Math.abs(percentDiff)}%`;
-                } else if (diff > 0) {
-                    pill.className = "pill pill-bad";
-                    pill.innerText = `↑ ${Math.abs(percentDiff)}%`;
-                } else {
-                    pill.className = "pill pill-neutral";
-                    pill.innerText = "= 0%";
-                }
+                if (diff < 0) { pill.className = "pill pill-good"; pill.innerText = `↓ ${Math.abs(percentDiff)}%`; } 
+                else if (diff > 0) { pill.className = "pill pill-bad"; pill.innerText = `↑ ${Math.abs(percentDiff)}%`; } 
+                else { pill.className = "pill pill-neutral"; pill.innerText = "= 0%"; }
             } else {
-                pill.className = "pill pill-neutral";
-                pill.innerText = "--";
+                pill.className = "pill pill-neutral"; pill.innerText = "--";
             }
-
-            // 3. Overall Indicator (Average)
-            // Just basic daily average tracking for "Overall"
-            // Filter all expenses ever
-            const totalSpentEver = expenses.reduce((sum, e) => sum + e.amount, 0);
-            // Count unique days with spending? Or just days since first entry?
-            // Simple approach: Total / 30 for a rough "Monthly Average" feel
-            // Or compare current month vs Average of all previous full months.
         }
 
-        function changeMonth(dir) { viewDate.setMonth(viewDate.getMonth() + dir); renderAll(); if(isSummaryMode) renderSummary(); }
+        function changeMonth(dir) { 
+            viewDate.setMonth(viewDate.getMonth() + dir); 
+            renderAll(); 
+            if(isSummaryMode) renderSummary(); 
+        }
         function jumpToToday() { viewDate = new Date(); renderAll(); if(isSummaryMode) renderSummary(); }
 
         function toggleView() {
@@ -365,23 +343,19 @@
         function renderAll() {
             const list = document.getElementById('expenseList');
             document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-
+            
             const filtered = expenses
                 .map((e, i) => ({ ...e, originalIndex: i }))
                 .filter(e => {
                     const d = new Date(e.date);
                     return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
                 })
-                .sort((a, b) => {
-                    if (b.date !== a.date) return b.date - a.date;
-                    return b.originalIndex - a.originalIndex;
-                });
+                .sort((a, b) => { if (b.date !== a.date) return b.date - a.date; return b.originalIndex - a.originalIndex; });
 
             list.innerHTML = filtered.map((e) => {
                 const col = getColor(e.category);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
-                return `
-                <li onclick="editItem(${e.originalIndex})" class="stack-item p-6 flex justify-between items-center" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
+                return `<li onclick="editItem(${e.originalIndex})" class="stack-item p-6 flex justify-between items-center" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
                     <div class="flex flex-col text-left">
                         <span class="text-sm font-black uppercase tracking-tight">${e.category}</span>
                         <span class="text-[9px] font-bold opacity-40 uppercase">${new Date(e.date).toLocaleDateString('hu-HU')}</span>
@@ -395,10 +369,7 @@
 
             const currentTotal = filtered.reduce((sum, e) => sum + e.amount, 0);
             document.getElementById('totalDisplay').innerText = `${currentTotal.toLocaleString('hu-HU')} Ft`;
-            
-            // RUN METRICS
             calculateMetrics(currentTotal);
-            
             localStorage.setItem('expenses', JSON.stringify(expenses));
         }
 
@@ -415,13 +386,7 @@
                 const p = grand > 0 ? (amt / grand * 100).toFixed(0) : 0;
                 const col = getColor(cat);
                 const isLight = ['#c7c7cc', '#F8F8F2', '#8e8e93'].includes(col);
-                return `<li>
-                    <div class="flex justify-between items-center p-5 rounded-2xl" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}">
-                        <span class="text-sm font-black uppercase tracking-tight">${cat}</span>
-                        <span class="text-md font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span>
-                    </div>
-                    <div class="progress-bar"><div class="progress-fill" style="width: 0%; background:${col}" data-w="${p}"></div></div>
-                </li>`;
+                return `<li><div class="flex justify-between items-center p-5 rounded-2xl" style="background: ${col}; color: ${isLight ? '#000' : '#FFF'}"><span class="text-sm font-black uppercase tracking-tight">${cat}</span><span class="text-md font-black tabular-nums">${Number(amt).toLocaleString('hu-HU')} Ft</span></div><div class="progress-bar"><div class="progress-fill" style="width: 0%; background:${col}" data-w="${p}"></div></div></li>`;
             }).join('');
             setTimeout(() => { document.querySelectorAll('.progress-fill').forEach(el => el.style.width = el.dataset.w + '%'); }, 50);
         }

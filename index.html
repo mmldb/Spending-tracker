@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>SpendTracker Cloud</title>
-    <link rel="manifest" href="manifest.json">
+    <title>SpendTracker Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -36,8 +35,6 @@
 
         /* INPUT OVERLAY */
         .input-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; z-index: 100; padding: 1.5rem; display: flex; flex-direction: column; }
-        
-        /* 3 COLUMNS GRID */
         .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex: 1; overflow-y: auto; padding-bottom: 20px; }
         .category-btn { background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; height: 60px; font-weight: 800; font-size: 11px; text-transform: uppercase; display: flex; align-items: center; justify-content: center; user-select: none; }
         .category-btn:active { background: #333; border-color: #fff; }
@@ -144,11 +141,9 @@
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         const PALETTE = ['#B2FF00', '#1AAEFC', '#8455EA', '#F2C94C', '#F2994A', '#EB5757', '#E0E0E0', '#00E0FF'];
-        
-        // --- DATA ---
         let expenses = []; 
-        let categories = []; // Now fetched from DB
-        let categoryUsage = {}; // Calculated on the fly
+        let categories = []; 
+        let categoryUsage = {}; 
         let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
         let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 0;
         
@@ -158,54 +153,27 @@
         let isSummaryMode = false;
         let longPressTimer;
 
-        async function init() { 
-            await Promise.all([fetchCategories(), fetchExpenses()]);
-        }
+        async function init() { await Promise.all([fetchCategories(), fetchExpenses()]); }
 
-        // --- DB OPS ---
-        
-        // 1. Fetch Categories
+        // --- DB ---
         async function fetchCategories() {
             const { data, error } = await sb.from('categories').select('*');
-            if (!error) {
-                if (data.length === 0) {
-                    // Seed defaults if empty
-                    const defaults = ['Food', 'Transport', 'Rent', 'Tech', 'Health', 'Fun'];
-                    const inserts = defaults.map(name => ({ name }));
-                    await sb.from('categories').insert(inserts);
-                    categories = defaults.map((name, i) => ({ id: i, name }));
-                } else {
-                    categories = data;
-                }
+            if (!error && data.length > 0) categories = data;
+            else if (data.length === 0) {
+                const defaults = ['Food', 'Transport', 'Rent', 'Tech', 'Health', 'Fun'];
+                await sb.from('categories').insert(defaults.map(name => ({ name })));
+                categories = defaults.map((name, i) => ({ id: i, name }));
             }
         }
+        async function addCategoryToDb(name) { await sb.from('categories').insert([{ name }]); await fetchCategories(); }
+        async function deleteCategoryFromDb(name) { await sb.from('categories').delete().eq('name', name); await fetchCategories(); }
 
-        // 2. Add Category to DB
-        async function addCategoryToDb(name) {
-            const { error } = await sb.from('categories').insert([{ name }]);
-            if (!error) await fetchCategories();
-        }
-
-        // 3. Delete Category from DB
-        async function deleteCategoryFromDb(name) {
-            const { error } = await sb.from('categories').delete().eq('name', name);
-            if (!error) await fetchCategories();
-        }
-
-        // 4. Fetch Expenses & Calculate Usage
         async function fetchExpenses() {
             document.getElementById('loadingIndicator').classList.remove('hidden');
             const { data, error } = await sb.from('expenses').select('*').order('date', { ascending: false });
-            if(error) { console.error(error); alert('Sync Error'); }
-            else { 
+            if(!error) { 
                 expenses = data || []; 
-                
-                // Recalculate Usage for Sorting
-                categoryUsage = {};
-                expenses.forEach(e => {
-                    categoryUsage[e.category] = (categoryUsage[e.category] || 0) + 1;
-                });
-                
+                categoryUsage = {}; expenses.forEach(e => categoryUsage[e.category] = (categoryUsage[e.category] || 0) + 1);
                 renderAll(); 
             }
             document.getElementById('loadingIndicator').classList.add('hidden');
@@ -213,26 +181,23 @@
 
         async function saveToDb(cat, amt, date, note, id = null) {
             document.getElementById('loadingIndicator').classList.remove('hidden');
-            let error;
             const payload = { category: cat, amount: amt, date: date, note: note || null };
-            if (id) { const { err } = await sb.from('expenses').update(payload).eq('id', id); error = err; } 
-            else { const { err } = await sb.from('expenses').insert([payload]); error = err; }
-            if (error) alert("Save failed"); else await fetchExpenses();
+            const { error } = id ? await sb.from('expenses').update(payload).eq('id', id) : await sb.from('expenses').insert([payload]);
+            if (!error) await fetchExpenses();
         }
 
         async function deleteFromDb(id) {
-            if(!confirm("Delete transaction?")) return;
+            if(!confirm("Delete?")) return;
             document.getElementById('loadingIndicator').classList.remove('hidden');
             const { error } = await sb.from('expenses').delete().eq('id', id);
             if(!error) await fetchExpenses();
         }
 
-        // --- APP LOGIC ---
+        // --- UI ---
         function openInputMode(isNew = true) {
             document.getElementById('inputOverlay').classList.remove('hidden');
             const scroller = document.getElementById('dateScrollerWrapper');
             scroller.classList.remove('hidden');
-
             if(isNew) {
                 currentEditItem = null;
                 document.getElementById('amountInput').value = '';
@@ -244,10 +209,8 @@
                 document.getElementById('inputHeaderLabel').innerText = "Edit Entry";
                 document.getElementById('dateLocationTop').appendChild(scroller);
             }
-            
             document.getElementById('amountInput').focus();
-            renderCategories();
-            renderDateScroller();
+            renderCategories(); renderDateScroller();
         }
 
         function closeInputMode() {
@@ -261,8 +224,7 @@
             const raw = document.getElementById('amountInput').value.replace(/\s+/g, '');
             const note = document.getElementById('noteInput').value.trim();
             if(!raw) return;
-            const amt = parseFloat(raw);
-            saveToDb(cat, amt, selectedTimestamp, note, currentEditItem ? currentEditItem.id : null);
+            saveToDb(cat, parseFloat(raw), selectedTimestamp, note, currentEditItem ? currentEditItem.id : null);
             closeInputMode();
         }
 
@@ -280,7 +242,6 @@
                 const d = new Date(e.date);
                 return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
             }); 
-
             const total = currentMonthData.reduce((sum, e) => sum + e.amount, 0);
             document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
 
@@ -289,9 +250,7 @@
                 const isBright = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(col);
                 const textColor = isBright ? '#000000' : '#FFFFFF';
                 const metaColor = isBright ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
-                
                 const noteHtml = e.note ? `<span class="block text-[10px] italic font-medium opacity-80 mt-0.5" style="color:${textColor}">${e.note}</span>` : '';
-
                 return `
                 <li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}">
                     <div class="flex flex-col">
@@ -309,33 +268,8 @@
             updateControlGrid(total);
             if(isSummaryMode) renderSummaryList(currentMonthData, total);
         }
-        
         function editById(id) { const item = expenses.find(e => e.id === id); if(item) editItem(item); }
 
-        function startLongPress(catName) {
-            longPressTimer = setTimeout(() => {
-                if(confirm(`Delete category "${catName}" and all associated data permanently?`)) {
-                    deleteCategoryFromDb(catName);
-                }
-            }, 800);
-        }
-        function cancelLongPress() { clearTimeout(longPressTimer); }
-
-        function renderCategories() {
-            // Sort categories by local usage stats
-            const sorted = [...categories].sort((a,b) => (categoryUsage[b.name]||0) - (categoryUsage[a.name]||0));
-            
-            let activeCat = currentEditItem ? currentEditItem.category : null;
-            document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
-                const activeClass = (c.name === activeCat) ? 'active-edit' : '';
-                return `<button 
-                    onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" 
-                    ontouchstart="startLongPress('${c.name}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()"
-                    onclick="saveTransaction('${c.name}')" class="category-btn ${activeClass}">${c.name}</button>`;
-            }).join('');
-        }
-
-        // --- HELPERS ---
         function updateControlGrid(currentTotal) {
             const budgetLabel = document.getElementById('budgetLeftLabel');
             const waterline = document.getElementById('waterlineFill');
@@ -356,18 +290,29 @@
                 if (diff < 0) compContainer.innerHTML = `<span class="pill pill-good">↓ ${Math.abs(pct)}%</span>`;
                 else if (diff > 0) compContainer.innerHTML = `<span class="pill pill-bad">↑ ${Math.abs(pct)}%</span>`;
                 else compContainer.innerHTML = `<span class="pill pill-neutral">=</span>`;
-            } else { compContainer.innerHTML = `<span class="pill pill-neutral">--</span>`; }
+            } else { 
+                // Handle case where we have current spending but no previous spending (New/Infinite increase)
+                if (currentTotal > 0) compContainer.innerHTML = `<span class="pill pill-neutral">NEW</span>`;
+                else compContainer.innerHTML = `<span class="pill pill-neutral">--</span>`;
+            }
         }
 
         function getComparisonData() {
             let compareDayLimit = 31; const now = new Date();
+            // If viewing current month, limit to today. Else limit to 31 (full month).
             if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) compareDayLimit = now.getDate();
+            
             let prevMonthIdx = viewDate.getMonth() - 1; let prevYear = viewDate.getFullYear();
             if (prevMonthIdx < 0) { prevMonthIdx = 11; prevYear -= 1; }
-            const prevExpenses = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === prevMonthIdx && d.getFullYear() === prevYear && d.getDate() <= compareDayLimit; });
+            
+            const prevExpenses = expenses.filter(e => { 
+                const d = new Date(e.date); 
+                return d.getMonth() === prevMonthIdx && d.getFullYear() === prevYear && d.getDate() <= compareDayLimit; 
+            });
             return { prevTotal: prevExpenses.reduce((sum, e) => sum + e.amount, 0), prevExpenses };
         }
 
+        // --- REST OF HELPERS (Renderers, etc) ---
         function renderSummaryList(data, grandTotal) {
             const totals = {}; data.forEach(e => totals[e.category] = (totals[e.category] || 0) + e.amount);
             const sorted = Object.entries(totals).sort((a,b) => b[1] - a[1]);
@@ -386,48 +331,15 @@
                     else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
                 } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
 
-                return `
-                <li class="stack-item" style="background: #000; border-color: #333;">
+                return `<li class="stack-item" style="background: #000; border-color: #333;">
                     <div class="summary-fill" style="width: 0%; background-color: ${col};" data-width="${pct}%"></div>
                     <div class="item-content">
                         <div class="flex items-center"><span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span>${pillHTML}</div>
                         <span class="text-md font-black tabular-nums">${Math.round(amt).toLocaleString('hu-HU')} Ft</span>
-                    </div>
-                </li>`;
+                    </div></li>`;
             }).join('');
             setTimeout(() => { document.querySelectorAll('.summary-fill').forEach(el => el.style.width = el.getAttribute('data-width')); }, 50);
             renderGraph(data);
-        }
-
-        function toggleView() {
-            isSummaryMode = !isSummaryMode;
-            document.getElementById('controlGrid').classList.toggle('hidden', isSummaryMode);
-            document.getElementById('activityView').classList.toggle('hidden', isSummaryMode);
-            document.getElementById('summaryView').classList.toggle('hidden', !isSummaryMode);
-            if(isSummaryMode) renderAll();
-        }
-
-        function getColor(cat) {
-            if(!categoryColors[cat]) { categoryColors[cat] = PALETTE[Object.keys(categoryColors).length % PALETTE.length]; localStorage.setItem('categoryColors', JSON.stringify(categoryColors)); }
-            return categoryColors[cat];
-        }
-
-        function syncSelectedDateToView() {
-            const now = new Date();
-            if(now.getMonth() === viewDate.getMonth()) selectedTimestamp = new Date().setHours(12,0,0,0);
-            else selectedTimestamp = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).setHours(12,0,0,0);
-        }
-
-        function renderDateScroller() {
-            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
-            let html = '';
-            for(let i=1; i<=daysInMonth; i++) {
-                const ts = new Date(viewDate.getFullYear(), viewDate.getMonth(), i).setHours(12,0,0,0);
-                const isSel = ts === selectedTimestamp;
-                html += `<div onclick="selectedTimestamp=${ts}; renderDateScroller()" class="date-card ${isSel?'selected':''}"><span class="text-[9px] font-bold uppercase">DAY</span><span class="text-lg font-black">${i}</span></div>`;
-            }
-            document.getElementById('dateScroller').innerHTML = html;
-            setTimeout(() => { const sel = document.querySelector('.date-card.selected'); if(sel) sel.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }, 10);
         }
 
         function renderGraph(data) {
@@ -442,12 +354,47 @@
             svg.innerHTML = `<defs><linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="white" stop-opacity="0.2"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" class="chart-area" /><polyline points="${pts}" class="chart-line" />`;
         }
 
+        function renderCategories() {
+            const sorted = [...categories].sort((a,b) => (categoryUsage[b.name]||0) - (categoryUsage[a.name]||0));
+            let activeCat = currentEditItem ? currentEditItem.category : null;
+            document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
+                const activeClass = (c.name === activeCat) ? 'active-edit' : '';
+                return `<button onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress('${c.name}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()" onclick="saveTransaction('${c.name}')" class="category-btn ${activeClass}">${c.name}</button>`;
+            }).join('');
+        }
+
+        function startLongPress(catName) {
+            longPressTimer = setTimeout(() => { if(confirm(`Delete "${catName}"?`)) deleteCategoryFromDb(catName); }, 800);
+        }
+        function cancelLongPress() { clearTimeout(longPressTimer); }
+
+        function renderDateScroller() {
+            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
+            let html = '';
+            for(let i=1; i<=daysInMonth; i++) {
+                const ts = new Date(viewDate.getFullYear(), viewDate.getMonth(), i).setHours(12,0,0,0);
+                const isSel = ts === selectedTimestamp;
+                html += `<div onclick="selectedTimestamp=${ts}; renderDateScroller()" class="date-card ${isSel?'selected':''}"><span class="text-[9px] font-bold uppercase">DAY</span><span class="text-lg font-black">${i}</span></div>`;
+            }
+            document.getElementById('dateScroller').innerHTML = html;
+            setTimeout(() => { const sel = document.querySelector('.date-card.selected'); if(sel) sel.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }, 10);
+        }
+
+        function toggleView() {
+            isSummaryMode = !isSummaryMode;
+            document.getElementById('controlGrid').classList.toggle('hidden', isSummaryMode);
+            document.getElementById('activityView').classList.toggle('hidden', isSummaryMode);
+            document.getElementById('summaryView').classList.toggle('hidden', !isSummaryMode);
+            if(isSummaryMode) renderAll();
+        }
+
+        function getColor(cat) { if(!categoryColors[cat]) { categoryColors[cat] = PALETTE[Object.keys(categoryColors).length % PALETTE.length]; localStorage.setItem('categoryColors', JSON.stringify(categoryColors)); } return categoryColors[cat]; }
+        function syncSelectedDateToView() { const now = new Date(); if(now.getMonth() === viewDate.getMonth()) selectedTimestamp = new Date().setHours(12,0,0,0); else selectedTimestamp = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).setHours(12,0,0,0); }
         document.getElementById('amountInput').addEventListener('input', (e) => { e.target.value = Number(e.target.value.replace(/[^0-9]/g, '')).toLocaleString('hu-HU').replace(/,/g,' '); });
-        window.changeMonth = (d) => { viewDate.setMonth(viewDate.getMonth()+d); init(); };
-        window.jumpToToday = () => { viewDate = new Date(); init(); };
+        window.changeMonth = (d) => { viewDate.setMonth(viewDate.getMonth()+d); fetchExpenses(); };
+        window.jumpToToday = () => { viewDate = new Date(); fetchExpenses(); };
         window.setBudget = () => { const n = prompt("Monthly Limit:", budgetLimit); if(n!==null) { budgetLimit = parseFloat(n); localStorage.setItem('budgetLimit', budgetLimit); renderAll(); }};
         window.addNewCategory = () => { const n = prompt("New Category:"); if(n) { addCategoryToDb(n); }};
-        window.deleteItem = (i) => { if(confirm("Delete?")) { expenses.splice(i,1); renderAll(); }};
         window.clearAll = () => { if(confirm("Reset App?")) { localStorage.clear(); location.reload(); }};
         window.exportToCSV = () => { /* CSV Logic */ };
 

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>SpendTracker Pro</title>
+    <title>SpendTracker Cloud</title>
+    <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -17,7 +18,7 @@
         }
         .app-container { max-width: 28rem; margin: 0 auto; width: 100%; padding: 1.5rem; display: flex; flex-direction: column; flex: 1; }
         
-        /* 2x2 GRID */
+        /* CONTROL GRID */
         .control-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 100px 100px; gap: 8px; margin-bottom: 2rem; }
         .control-card { background: #1c1c1e; border: 1px solid #27272a; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; transition: transform 0.1s; }
         .control-card:active { transform: scale(0.98); background: #27272a; }
@@ -36,9 +37,8 @@
         /* INPUT OVERLAY */
         .input-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; z-index: 100; padding: 1.5rem; display: flex; flex-direction: column; }
         
-        /* UPDATED: 3 Column Grid */
+        /* 3 COLUMNS GRID */
         .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex: 1; overflow-y: auto; padding-bottom: 20px; }
-        
         .category-btn { background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; height: 60px; font-weight: 800; font-size: 11px; text-transform: uppercase; display: flex; align-items: center; justify-content: center; user-select: none; }
         .category-btn:active { background: #333; border-color: #fff; }
         .category-btn.active-edit { background: #FFFFFF !important; color: #000000 !important; border-color: #FFFFFF !important; box-shadow: 0 0 15px rgba(255,255,255,0.3); }
@@ -68,7 +68,6 @@
 </head>
 <body class="font-sans text-sm">
     <div class="app-container">
-        
         <div class="flex justify-between items-center mb-8 px-2">
             <button onclick="changeMonth(-1)" class="text-zinc-500 text-2xl font-black p-2"><<<</button>
             <span id="currentMonthLabel" class="text-xs font-black uppercase tracking-[0.25em] text-white">JANUARY 2026</span>
@@ -128,11 +127,8 @@
         <input id="amountInput" type="text" inputmode="decimal" placeholder="0" class="w-full bg-transparent border-b-2 border-zinc-800 py-4 text-6xl font-black text-center outline-none focus:border-white transition-colors mb-4 text-white">
         
         <div id="dateLocationTop" class="mb-4"></div>
-
         <div id="categoryGrid" class="category-grid mb-6"></div>
-        
         <input id="noteInput" type="text" placeholder="Add a note..." class="w-full bg-[#1c1c1e] text-white p-4 rounded-xl mb-6 outline-none text-center text-sm font-bold placeholder-zinc-700 border border-zinc-800 focus:border-zinc-600">
-
         <div id="dateLocationBottom" class="mt-auto"></div>
         
         <div id="dateScrollerWrapper" class="hidden">
@@ -148,9 +144,11 @@
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         const PALETTE = ['#B2FF00', '#1AAEFC', '#8455EA', '#F2C94C', '#F2994A', '#EB5757', '#E0E0E0', '#00E0FF'];
+        
+        // --- DATA ---
         let expenses = []; 
-        let categories = JSON.parse(localStorage.getItem('categories')) || ['Food', 'Transport', 'Rent', 'Tech', 'Health', 'Fun'];
-        let categoryUsage = JSON.parse(localStorage.getItem('categoryUsage')) || {};
+        let categories = []; // Now fetched from DB
+        let categoryUsage = {}; // Calculated on the fly
         let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
         let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 0;
         
@@ -160,14 +158,56 @@
         let isSummaryMode = false;
         let longPressTimer;
 
-        async function init() { await fetchExpenses(); }
+        async function init() { 
+            await Promise.all([fetchCategories(), fetchExpenses()]);
+        }
 
         // --- DB OPS ---
+        
+        // 1. Fetch Categories
+        async function fetchCategories() {
+            const { data, error } = await sb.from('categories').select('*');
+            if (!error) {
+                if (data.length === 0) {
+                    // Seed defaults if empty
+                    const defaults = ['Food', 'Transport', 'Rent', 'Tech', 'Health', 'Fun'];
+                    const inserts = defaults.map(name => ({ name }));
+                    await sb.from('categories').insert(inserts);
+                    categories = defaults.map((name, i) => ({ id: i, name }));
+                } else {
+                    categories = data;
+                }
+            }
+        }
+
+        // 2. Add Category to DB
+        async function addCategoryToDb(name) {
+            const { error } = await sb.from('categories').insert([{ name }]);
+            if (!error) await fetchCategories();
+        }
+
+        // 3. Delete Category from DB
+        async function deleteCategoryFromDb(name) {
+            const { error } = await sb.from('categories').delete().eq('name', name);
+            if (!error) await fetchCategories();
+        }
+
+        // 4. Fetch Expenses & Calculate Usage
         async function fetchExpenses() {
             document.getElementById('loadingIndicator').classList.remove('hidden');
             const { data, error } = await sb.from('expenses').select('*').order('date', { ascending: false });
             if(error) { console.error(error); alert('Sync Error'); }
-            else { expenses = data || []; renderAll(); }
+            else { 
+                expenses = data || []; 
+                
+                // Recalculate Usage for Sorting
+                categoryUsage = {};
+                expenses.forEach(e => {
+                    categoryUsage[e.category] = (categoryUsage[e.category] || 0) + 1;
+                });
+                
+                renderAll(); 
+            }
             document.getElementById('loadingIndicator').classList.add('hidden');
         }
 
@@ -223,8 +263,6 @@
             if(!raw) return;
             const amt = parseFloat(raw);
             saveToDb(cat, amt, selectedTimestamp, note, currentEditItem ? currentEditItem.id : null);
-            categoryUsage[cat] = (categoryUsage[cat] || 0) + 1;
-            localStorage.setItem('categoryUsage', JSON.stringify(categoryUsage));
             closeInputMode();
         }
 
@@ -274,29 +312,30 @@
         
         function editById(id) { const item = expenses.find(e => e.id === id); if(item) editItem(item); }
 
-        function startLongPress(cat) {
+        function startLongPress(catName) {
             longPressTimer = setTimeout(() => {
-                if(confirm(`Delete category "${cat}" permanently?`)) {
-                    categories = categories.filter(c => c !== cat);
-                    localStorage.setItem('categories', JSON.stringify(categories));
-                    renderCategories();
+                if(confirm(`Delete category "${catName}" and all associated data permanently?`)) {
+                    deleteCategoryFromDb(catName);
                 }
             }, 800);
         }
         function cancelLongPress() { clearTimeout(longPressTimer); }
 
         function renderCategories() {
-            const sorted = [...categories].sort((a,b) => (categoryUsage[b]||0) - (categoryUsage[a]||0));
+            // Sort categories by local usage stats
+            const sorted = [...categories].sort((a,b) => (categoryUsage[b.name]||0) - (categoryUsage[a.name]||0));
+            
             let activeCat = currentEditItem ? currentEditItem.category : null;
             document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
-                const activeClass = (c === activeCat) ? 'active-edit' : '';
+                const activeClass = (c.name === activeCat) ? 'active-edit' : '';
                 return `<button 
-                    onmousedown="startLongPress('${c}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" 
-                    ontouchstart="startLongPress('${c}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()"
-                    onclick="saveTransaction('${c}')" class="category-btn ${activeClass}">${c}</button>`;
+                    onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" 
+                    ontouchstart="startLongPress('${c.name}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()"
+                    onclick="saveTransaction('${c.name}')" class="category-btn ${activeClass}">${c.name}</button>`;
             }).join('');
         }
 
+        // --- HELPERS ---
         function updateControlGrid(currentTotal) {
             const budgetLabel = document.getElementById('budgetLeftLabel');
             const waterline = document.getElementById('waterlineFill');
@@ -407,7 +446,7 @@
         window.changeMonth = (d) => { viewDate.setMonth(viewDate.getMonth()+d); init(); };
         window.jumpToToday = () => { viewDate = new Date(); init(); };
         window.setBudget = () => { const n = prompt("Monthly Limit:", budgetLimit); if(n!==null) { budgetLimit = parseFloat(n); localStorage.setItem('budgetLimit', budgetLimit); renderAll(); }};
-        window.addNewCategory = () => { const n = prompt("New Category:"); if(n && !categories.includes(n)) { categories.push(n); localStorage.setItem('categories', JSON.stringify(categories)); renderCategories(); }};
+        window.addNewCategory = () => { const n = prompt("New Category:"); if(n) { addCategoryToDb(n); }};
         window.deleteItem = (i) => { if(confirm("Delete?")) { expenses.splice(i,1); renderAll(); }};
         window.clearAll = () => { if(confirm("Reset App?")) { localStorage.clear(); location.reload(); }};
         window.exportToCSV = () => { /* CSV Logic */ };

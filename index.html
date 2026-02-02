@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
     
-    <title>SpendTracker 1.4.1</title>
+    <title>SpendTracker 1.5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -248,22 +248,16 @@
             const { data, error } = await sb.from('categories').select('*').order('created_at', { ascending: true });
             if(!error) {
                 categories = data || [];
-                
-                // --- STRICT COLOR ENFORCEMENT ---
-                // This checks every category. If the saved color doesn't match the new palette, it forces an update.
                 let needsUpdate = false;
                 for (let i = 0; i < categories.length; i++) {
-                    const expectedColor = generateSmartColor(i);
-                    // Standardize hex for comparison (lowercase)
-                    if (!categories[i].color || categories[i].color.toLowerCase() !== expectedColor.toLowerCase()) {
-                        console.log(`Fixing color for ${categories[i].name}`);
-                        await sb.from('categories').update({ color: expectedColor }).eq('id', categories[i].id);
-                        categories[i].color = expectedColor; 
+                    if (!categories[i].color) {
+                        const newColor = generateSmartColor(i);
+                        await sb.from('categories').update({ color: newColor }).eq('id', categories[i].id);
+                        categories[i].color = newColor; 
                         needsUpdate = true;
                     }
                 }
                 if(needsUpdate) console.log("Palette Enforced");
-                
                 renderCategories();
             }
         }
@@ -383,11 +377,19 @@
                     else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
                 } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
                 const count = counts[cat] || 0;
+                
+                // --- NEW: SHARE % ---
+                const share = grandTotal > 0 ? Math.round((amt / grandTotal) * 100) : 0;
+
                 return `
                 <li onclick="openFocusView('${cat}')" class="stack-item" style="background: #000; border-color: #333;">
                     <div class="summary-fill" style="width: 0%; background-color: ${col};" data-width="${pct}%"></div>
                     <div class="item-content">
-                        <div class="flex items-center"><span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span><span class="opacity-50 ml-1 text-[9px] font-bold">(${count})</span>${pillHTML}</div>
+                        <div class="flex items-center">
+                            <span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span>
+                            <span class="opacity-50 ml-1 text-[9px] font-bold">(${count}) &middot; ${share}%</span>
+                            ${pillHTML}
+                        </div>
                         <span class="text-md font-black tabular-nums">${Math.round(amt).toLocaleString('hu-HU')} Ft</span>
                     </div></li>`;
             }).join('');

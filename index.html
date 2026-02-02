@@ -3,30 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    
-    <title>SpendTracker 1.5.2</title>
+    <title>SpendTracker 1.6</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* CORE RESET */
         html { background-color: #000000; }
         body { 
             background-color: #000000; color: #FFFFFF; 
             -webkit-tap-highlight-color: transparent; 
             min-height: 100vh; display: flex; flex-direction: column; 
             font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow-x: hidden;
-            -webkit-user-select: none; user-select: none;
-            -webkit-touch-callout: none;
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
+            -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+            padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
         }
         .app-container { max-width: 28rem; margin: 0 auto; width: 100%; padding: 1.5rem; display: flex; flex-direction: column; flex: 1; position: relative; }
-        
-        /* CONTROL GRID */
         .control-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 100px 100px; gap: 8px; margin-bottom: 2rem; }
         .control-card { background: #1c1c1e; border: 1px solid #27272a; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; transition: transform 0.1s; }
         .control-card:active { transform: scale(0.98); background: #27272a; }
@@ -34,35 +27,17 @@
         .btn-add:active { background: #e4e4e7; }
         .btn-sum { color: #a1a1aa; }
         .btn-sum:active { background: #333; color: #FFF; }
-
-        /* LISTS */
         .stack-list { display: flex; flex-direction: column; padding-bottom: 40px; }
-        .stack-item { 
-            margin-bottom: -1px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; 
-            position: relative; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); transition: filter 0.2s; min-height: 44px; 
-        }
+        .stack-item { margin-bottom: -1px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; position: relative; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); transition: filter 0.2s; min-height: 44px; }
         .stack-item:active { filter: brightness(1.2); }
         .stack-item:first-child { border-top-left-radius: 16px; border-top-right-radius: 16px; }
         .stack-item:last-child { border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; border-bottom: 1px solid #27272a; margin-bottom: 0; }
-
-        /* OVERLAYS */
         .input-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; z-index: 100; padding: 1.5rem; display: flex; flex-direction: column; padding-top: calc(1.5rem + env(safe-area-inset-top)); }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        
-        /* 3 COLUMNS GRID */
         .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex: 1; overflow-y: auto; padding-bottom: 20px; }
-        
-        /* BUTTONS */
-        .category-btn { 
-            background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; height: 60px; 
-            font-weight: 800; font-size: 11px; text-transform: uppercase; 
-            display: flex; align-items: center; justify-content: center; 
-            transition: transform 0.1s;
-        }
+        .category-btn { background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; height: 60px; font-weight: 800; font-size: 11px; text-transform: uppercase; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
         .category-btn:active { transform: scale(0.96); }
         .category-btn.active-edit { border: 3px solid #FFFFFF !important; box-shadow: 0 0 15px rgba(255,255,255,0.5); }
-
-        /* VISUALS */
         .pill { font-size: 10px; font-weight: 900; padding: 3px 6px; border-radius: 6px; text-transform: uppercase; }
         .pill-good { background: rgba(34, 197, 94, 0.3); color: #4ade80; }
         .pill-bad { background: rgba(239, 68, 68, 0.3); color: #f87171; }
@@ -72,15 +47,12 @@
         .item-content { position: relative; z-index: 10; width: 100%; display: flex; justify-content: space-between; align-items: center; }
         .chart-line { fill: none; stroke: #fff; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; }
         .chart-area { fill: url(#gradient); opacity: 0.3; }
-        
         .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; }
         .date-scroller::-webkit-scrollbar { display: none; }
         .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
-
         .hidden { display: none !important; }
-        input { -webkit-user-select: text; user-select: text; }
-        input::placeholder { color: #333; }
+        input { -webkit-user-select: text; user-select: text; } input::placeholder { color: #333; }
         .spinner { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -143,6 +115,10 @@
                 <ul id="focusList" class="stack-list"></ul>
             </div>
         </div>
+        
+        <div class="text-center py-4">
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v1.6.0</span>
+        </div>
     </div>
 
     <div id="inputOverlay" class="input-overlay hidden">
@@ -151,14 +127,11 @@
             <span id="inputHeaderLabel" class="text-zinc-700 font-black text-xs uppercase tracking-widest">Add New</span>
             <button onclick="addNewCategory()" class="text-white font-bold text-xs uppercase tracking-widest">+ Cat</button>
         </div>
-        
         <input id="amountInput" type="text" inputmode="decimal" placeholder="0" class="w-full bg-transparent border-b-2 border-zinc-800 py-4 text-6xl font-black text-center outline-none focus:border-white transition-colors mb-4 text-white">
-        
         <div id="dateLocationTop" class="mb-4"></div>
         <div id="categoryGrid" class="category-grid mb-6"></div>
         <input id="noteInput" type="text" placeholder="Add a note..." class="w-full bg-[#1c1c1e] text-white p-4 rounded-xl mb-6 outline-none text-center text-sm font-bold placeholder-zinc-700 border border-zinc-800 focus:border-zinc-600">
         <div id="dateLocationBottom" class="mt-auto"></div>
-        
         <div id="dateScrollerWrapper" class="hidden">
             <span class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest block mb-3 text-center">Select Date</span>
             <div id="dateScroller" class="date-scroller"></div>
@@ -175,38 +148,20 @@
     </div>
 
     <script>
-        // --- CREDENTIALS ---
         const SUPABASE_URL = 'https://tqddyuhcddqddviyessk.supabase.co'; 
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxZGR5dWhjZGRxZGR2aXllc3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk5NzkxMTYsImV4cCI6MjA4NTU1NTExNn0.nYWIsAnfDFvR4JtujfstvFXyaEtAWgFExRFI38iEDv0';
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        // --- PALETTE ---
-        const BASE_PALETTE = [
-            '#FF9F1C', // 1. Orange
-            '#795548', // 2. Brown
-            '#FFD700', // 3. Yellow
-            '#D32F2F', // 4. Red
-            '#1976D2', // 5. Blue
-            '#673AB7', // 6. Purple
-            '#F8BBD0', // 7. Pink
-            '#FFF9C4', // 8. Beige
-            '#00796B', // 9. Teal
-            '#9E9E9E'  // 10. Grey
-        ];
-
+        const BASE_PALETTE = ['#FF9F1C', '#795548', '#FFD700', '#D32F2F', '#1976D2', '#673AB7', '#F8BBD0', '#FFF9C4', '#00796B', '#9E9E9E'];
+        
         let expenses = []; let categories = []; let categoryUsage = {}; 
         let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 0;
         let viewDate = new Date(); let selectedTimestamp = new Date().setHours(12,0,0,0);
-        let currentEditItem = null; let isSummaryMode = false; let longPressTimer;
-        let selectedCatForMenu = null;
+        let currentEditItem = null; let isSummaryMode = false; let longPressTimer; let selectedCatForMenu = null;
 
-        async function init() { 
-            await fetchCategories();
-            await fetchExpenses();
-        }
+        async function init() { await fetchCategories(); await fetchExpenses(); }
         function triggerHaptic() { if (navigator.vibrate) navigator.vibrate(50); }
 
-        // --- COLOR ENGINE ---
+        // --- COLOR ---
         function generateSmartColor(index) {
             const baseColor = BASE_PALETTE[index % BASE_PALETTE.length];
             const cycle = Math.floor(index / BASE_PALETTE.length);
@@ -214,36 +169,20 @@
             const brightness = (cycle % 2 === 1) ? 0.75 : 1.25;
             return adjustBrightness(baseColor, brightness);
         }
-
         function adjustBrightness(hex, percent) {
             hex = hex.replace(/^\s*#|\s*$/g, '');
             if(hex.length === 3) hex = hex.replace(/(.)/g, '$1$1');
-            let r = parseInt(hex.substr(0, 2), 16);
-            let g = parseInt(hex.substr(2, 2), 16);
-            let b = parseInt(hex.substr(4, 2), 16);
-            r = Math.min(255, Math.floor(r * percent));
-            g = Math.min(255, Math.floor(g * percent));
-            b = Math.min(255, Math.floor(b * percent));
-            return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+            let r = parseInt(hex.substr(0, 2), 16), g = parseInt(hex.substr(2, 2), 16), b = parseInt(hex.substr(4, 2), 16);
+            return `#${((1 << 24) + (Math.min(255, Math.floor(r * percent)) << 16) + (Math.min(255, Math.floor(g * percent)) << 8) + Math.min(255, Math.floor(b * percent))).toString(16).slice(1)}`;
         }
-
         function getContrastColor(hex) {
-            if(!hex) return '#FFFFFF';
-            hex = hex.replace(/^\s*#|\s*$/g, '');
-            if(hex.length === 3) hex = hex.replace(/(.)/g, '$1$1');
-            const r = parseInt(hex.substr(0, 2), 16);
-            const g = parseInt(hex.substr(2, 2), 16);
-            const b = parseInt(hex.substr(4, 2), 16);
-            const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-            return (yiq >= 128) ? '#000000' : '#FFFFFF';
+            if(!hex) return '#FFFFFF'; hex = hex.replace(/^\s*#|\s*$/g, '');
+            let r = parseInt(hex.substr(0, 2), 16), g = parseInt(hex.substr(2, 2), 16), b = parseInt(hex.substr(4, 2), 16);
+            return (((r * 299) + (g * 587) + (b * 114)) / 1000) >= 128 ? '#000000' : '#FFFFFF';
         }
+        function getCatColor(catName) { const c = categories.find(x => x.name === catName); return c ? c.color : '#333'; }
 
-        function getCatColor(catName) {
-            const c = categories.find(x => x.name === catName);
-            return c ? c.color : '#333'; 
-        }
-
-        // --- DB OPS ---
+        // --- DB ---
         async function fetchCategories() {
             const { data, error } = await sb.from('categories').select('*').order('created_at', { ascending: true });
             if(!error) {
@@ -253,56 +192,43 @@
                     if (!categories[i].color) {
                         const newColor = generateSmartColor(i);
                         await sb.from('categories').update({ color: newColor }).eq('id', categories[i].id);
-                        categories[i].color = newColor; 
-                        needsUpdate = true;
+                        categories[i].color = newColor; needsUpdate = true;
                     }
                 }
-                if(needsUpdate) console.log("Palette Enforced");
                 renderCategories();
             }
         }
-
         async function addCategoryToDb(name) {
-            const newIndex = categories.length; 
-            const newColor = generateSmartColor(newIndex);
+            const newIndex = categories.length; const newColor = generateSmartColor(newIndex);
             const { error } = await sb.from('categories').insert([{ name, color: newColor }]);
             if (!error) await fetchCategories();
         }
-
         async function renameCategoryDb(oldName, newName) {
             document.getElementById('loadingIndicator').classList.remove('hidden');
             await sb.from('categories').update({ name: newName }).eq('name', oldName);
             await sb.from('expenses').update({ category: newName }).eq('category', oldName);
-            await init(); 
-            triggerHaptic();
+            await init(); triggerHaptic();
         }
-
         async function deleteCategoryFromDb(name) {
             const { error } = await sb.from('categories').delete().eq('name', name);
             if (!error) { triggerHaptic(); await fetchCategories(); } else alert("Check connection");
         }
-
         async function fetchExpenses() {
             document.getElementById('loadingIndicator').classList.remove('hidden');
-            const { data, error } = await sb.from('expenses').select('*')
-                .order('date', { ascending: false })
-                .order('id', { ascending: false });
-                
+            const { data, error } = await sb.from('expenses').select('*').order('date', { ascending: false }).order('id', { ascending: false });
             if(!error) { 
-                expenses = data || []; 
-                categoryUsage = {}; expenses.forEach(e => categoryUsage[e.category] = (categoryUsage[e.category] || 0) + 1);
+                expenses = data || []; categoryUsage = {}; 
+                expenses.forEach(e => categoryUsage[e.category] = (categoryUsage[e.category] || 0) + 1);
                 renderAll(); 
             }
             document.getElementById('loadingIndicator').classList.add('hidden');
         }
-
         async function saveToDb(cat, amt, date, note, id = null) {
             document.getElementById('loadingIndicator').classList.remove('hidden');
             const payload = { category: cat, amount: amt, date: date, note: note || null };
             const { error } = id ? await sb.from('expenses').update(payload).eq('id', id) : await sb.from('expenses').insert([payload]);
             if (error) alert("Save failed"); else { triggerHaptic(); await fetchExpenses(); }
         }
-
         async function deleteFromDb(id) {
             if(!confirm("Delete?")) return;
             document.getElementById('loadingIndicator').classList.remove('hidden');
@@ -310,19 +236,13 @@
             if(!error) { triggerHaptic(); await fetchExpenses(); }
         }
 
-        // --- APP LOGIC ---
+        // --- RENDER ---
         function renderCategories() {
             const sorted = [...categories].sort((a,b) => (categoryUsage[b.name]||0) - (categoryUsage[a.name]||0));
             let activeCat = currentEditItem ? currentEditItem.category : null;
             document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
                 const activeClass = (c.name === activeCat) ? 'active-edit' : '';
-                const textColor = getContrastColor(c.color);
-                return `<button 
-                    style="background-color: ${c.color}; color: ${textColor}; border-color: ${c.color}"
-                    onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" 
-                    ontouchstart="startLongPress('${c.name}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()"
-                    onclick="saveTransaction('${c.name}')" oncontextmenu="return false;" 
-                    class="category-btn ${activeClass}">${c.name}</button>`;
+                return `<button style="background-color: ${c.color}; color: ${getContrastColor(c.color)}; border-color: ${c.color}" onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress('${c.name}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()" onclick="saveTransaction('${c.name}')" oncontextmenu="return false;" class="category-btn ${activeClass}">${c.name}</button>`;
             }).join('');
         }
 
@@ -339,19 +259,9 @@
                 const col = getCatColor(e.category);
                 const textColor = getContrastColor(col);
                 const noteHtml = e.note ? `<span class="block text-[8px] italic font-medium opacity-80" style="color:${textColor}">${e.note}</span>` : '';
-
-                return `
-                <li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}">
-                    <div class="flex flex-col leading-tight">
-                        <span class="text-xs font-black uppercase tracking-tight">${e.category}</span>
-                        ${noteHtml}
-                        <span class="text-[8px] font-bold uppercase opacity-70">${new Date(e.date).toLocaleDateString('hu-HU')}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="font-black text-sm tabular-nums">${Math.round(e.amount).toLocaleString('hu-HU')}</span>
-                        <button onclick="event.stopPropagation(); deleteFromDb(${e.id})" class="text-lg px-2 opacity-40 hover:opacity-100">×</button>
-                    </div>
-                </li>`;
+                return `<li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}">
+                    <div class="flex flex-col leading-tight"><span class="text-xs font-black uppercase tracking-tight">${e.category}</span>${noteHtml}<span class="text-[8px] font-bold uppercase opacity-70">${new Date(e.date).toLocaleDateString('hu-HU')}</span></div>
+                    <div class="flex items-center gap-2"><span class="font-black text-sm tabular-nums">${Math.round(e.amount).toLocaleString('hu-HU')}</span><button onclick="event.stopPropagation(); deleteFromDb(${e.id})" class="text-lg px-2 opacity-40 hover:opacity-100">×</button></div></li>`;
             }).join('');
 
             updateControlGrid(total, currentMonthData);
@@ -377,16 +287,16 @@
                     else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
                 } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
                 const count = counts[cat] || 0;
+                // FIXED PERCENTAGE DISPLAY
                 const share = grandTotal > 0 ? Math.round((amt / grandTotal) * 100) : 0;
 
-                // --- NEW HIGH VISIBILITY LAYOUT ---
-                return `
-                <li onclick="openFocusView('${cat}')" class="stack-item" style="background: #000; border-color: #333;">
+                return `<li onclick="openFocusView('${cat}')" class="stack-item" style="background: #000; border-color: #333;">
                     <div class="summary-fill" style="width: 0%; background-color: ${col};" data-width="${pct}%"></div>
                     <div class="item-content">
                         <div class="flex items-center">
                             <span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span>
-                            <span class="ml-2 text-[10px] font-bold text-zinc-500">(${count}) <span class="text-white opacity-60">· ${share}%</span></span>
+                            <span class="ml-2 text-[10px] font-bold text-zinc-500">(${count})</span>
+                            <span class="ml-1 text-[10px] font-bold text-white opacity-80">· ${share}%</span>
                             ${pillHTML}
                         </div>
                         <span class="text-md font-black tabular-nums">${Math.round(amt).toLocaleString('hu-HU')} Ft</span>
@@ -396,6 +306,7 @@
             renderGraph(data);
         }
 
+        // --- HELPERS (Same as before) ---
         function updateControlGrid(currentTotal, currentMonthData) {
             const budgetLabel = document.getElementById('budgetLeftLabel');
             const waterlineContainer = document.getElementById('waterlineContainer');
@@ -404,7 +315,6 @@
                 budgetLabel.innerText = `${left.toLocaleString('hu-HU')} Ft`;
                 budgetLabel.style.color = left < 0 ? '#f87171' : '#FFFFFF';
             } else { budgetLabel.innerText = "TAP TO SET"; }
-
             waterlineContainer.innerHTML = ''; 
             if (budgetLimit > 0 && currentTotal > 0) {
                 const catTotals = {}; currentMonthData.forEach(e => { catTotals[e.category] = (catTotals[e.category] || 0) + e.amount; });
@@ -417,48 +327,34 @@
             } else {
                 const emptyBar = document.createElement('div'); emptyBar.style.width = '0%'; emptyBar.style.backgroundColor = '#333'; waterlineContainer.appendChild(emptyBar);
             }
-            
             const { prevTotal } = getComparisonData();
             const compContainer = document.getElementById('comparisonContainer');
             if (prevTotal > 0) {
-                const diff = currentTotal - prevTotal;
-                const pct = ((diff / prevTotal) * 100).toFixed(0);
+                const diff = currentTotal - prevTotal; const pct = ((diff / prevTotal) * 100).toFixed(0);
                 if (diff < 0) compContainer.innerHTML = `<span class="pill pill-good">↓ ${Math.abs(pct)}%</span>`;
                 else if (diff > 0) compContainer.innerHTML = `<span class="pill pill-bad">↑ ${Math.abs(pct)}%</span>`;
                 else compContainer.innerHTML = `<span class="pill pill-neutral">=</span>`;
             } else { 
-                if (currentTotal > 0) compContainer.innerHTML = `<span class="pill pill-neutral">NEW</span>`;
-                else compContainer.innerHTML = `<span class="pill pill-neutral">--</span>`;
+                if (currentTotal > 0) compContainer.innerHTML = `<span class="pill pill-neutral">NEW</span>`; else compContainer.innerHTML = `<span class="pill pill-neutral">--</span>`;
             }
         }
-
         function openFocusView(cat) {
-            document.getElementById('summaryView').classList.add('hidden');
-            document.getElementById('focusView').classList.remove('hidden');
+            document.getElementById('summaryView').classList.add('hidden'); document.getElementById('focusView').classList.remove('hidden');
             document.getElementById('focusHeaderLabel').innerText = `${viewDate.toLocaleString('en-US', { month: 'long' })} - ${cat}`;
             const filtered = expenses.filter(e => {
-                const d = new Date(e.date);
-                return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && e.category === cat;
+                const d = new Date(e.date); return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && e.category === cat;
             }).sort((a,b) => b.date - a.date || b.id - a.id);
             const total = filtered.reduce((s,e) => s + e.amount, 0);
             document.getElementById('focusTotalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
             document.getElementById('focusList').innerHTML = filtered.map(e => {
-                const col = getCatColor(e.category);
-                const textColor = getContrastColor(col);
+                const col = getCatColor(e.category); const textColor = getContrastColor(col);
                 const noteHtml = e.note ? `<span class="block text-[8px] italic font-medium opacity-80" style="color:${textColor}">${e.note}</span>` : '';
-                return `
-                <li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}">
-                    <div class="flex flex-col leading-tight"><span class="text-xs font-black uppercase tracking-tight">${e.category}</span>${noteHtml}<span class="text-[8px] font-bold uppercase opacity-70">${new Date(e.date).toLocaleDateString('hu-HU')}</span></div>
-                    <div class="flex items-center gap-2"><span class="font-black text-sm tabular-nums">${Math.round(e.amount).toLocaleString('hu-HU')}</span><button onclick="event.stopPropagation(); deleteFromDb(${e.id})" class="text-lg px-2 opacity-40 hover:opacity-100">×</button></div>
-                </li>`;
+                return `<li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}"><div class="flex flex-col leading-tight"><span class="text-xs font-black uppercase tracking-tight">${e.category}</span>${noteHtml}<span class="text-[8px] font-bold uppercase opacity-70">${new Date(e.date).toLocaleDateString('hu-HU')}</span></div><div class="flex items-center gap-2"><span class="font-black text-sm tabular-nums">${Math.round(e.amount).toLocaleString('hu-HU')}</span><button onclick="event.stopPropagation(); deleteFromDb(${e.id})" class="text-lg px-2 opacity-40 hover:opacity-100">×</button></div></li>`;
             }).join('');
         }
-
-        // Standard Functions
         function openInputMode(isNew = true) {
             document.getElementById('inputOverlay').classList.remove('hidden');
-            const scroller = document.getElementById('dateScrollerWrapper');
-            scroller.classList.remove('hidden');
+            const scroller = document.getElementById('dateScrollerWrapper'); scroller.classList.remove('hidden');
             if(isNew) {
                 currentEditItem = null; document.getElementById('amountInput').value = ''; document.getElementById('noteInput').value = '';
                 document.getElementById('inputHeaderLabel').innerText = "Add New"; syncSelectedDateToView();
@@ -468,15 +364,10 @@
             }
             document.getElementById('amountInput').focus(); renderCategories(); renderDateScroller();
         }
-        function closeInputMode() {
-            document.getElementById('inputOverlay').classList.add('hidden'); document.getElementById('amountInput').blur(); document.getElementById('noteInput').blur(); currentEditItem = null;
-        }
+        function closeInputMode() { document.getElementById('inputOverlay').classList.add('hidden'); document.getElementById('amountInput').blur(); document.getElementById('noteInput').blur(); currentEditItem = null; }
         function saveTransaction(cat) {
-            const raw = document.getElementById('amountInput').value.replace(/\s+/g, '');
-            const note = document.getElementById('noteInput').value.trim();
-            if(!raw) return;
-            saveToDb(cat, parseFloat(raw), selectedTimestamp, note, currentEditItem ? currentEditItem.id : null);
-            closeInputMode();
+            const raw = document.getElementById('amountInput').value.replace(/\s+/g, ''); const note = document.getElementById('noteInput').value.trim();
+            if(!raw) return; saveToDb(cat, parseFloat(raw), selectedTimestamp, note, currentEditItem ? currentEditItem.id : null); closeInputMode();
         }
         function editItem(item) {
             currentEditItem = item; selectedTimestamp = item.date;
@@ -509,21 +400,17 @@
         }
         function syncSelectedDateToView() { const now = new Date(); if(now.getMonth() === viewDate.getMonth()) selectedTimestamp = new Date().setHours(12,0,0,0); else selectedTimestamp = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).setHours(12,0,0,0); }
         function renderDateScroller() {
-            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
-            let html = '';
+            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate(); let html = '';
             for(let i=1; i<=daysInMonth; i++) {
-                const ts = new Date(viewDate.getFullYear(), viewDate.getMonth(), i).setHours(12,0,0,0);
-                const isSel = ts === selectedTimestamp;
+                const ts = new Date(viewDate.getFullYear(), viewDate.getMonth(), i).setHours(12,0,0,0); const isSel = ts === selectedTimestamp;
                 html += `<div onclick="selectedTimestamp=${ts}; renderDateScroller()" class="date-card ${isSel?'selected':''}"><span class="text-[9px] font-bold uppercase">DAY</span><span class="text-lg font-black">${i}</span></div>`;
             }
             document.getElementById('dateScroller').innerHTML = html;
             setTimeout(() => { const sel = document.querySelector('.date-card.selected'); if(sel) sel.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }, 10);
         }
         function renderGraph(data) {
-            const days = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
-            const daily = new Array(days).fill(0);
-            data.forEach(e => daily[new Date(e.date).getDate()-1] += e.amount);
-            const max = Math.max(...daily, 10);
+            const days = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate(); const daily = new Array(days).fill(0);
+            data.forEach(e => daily[new Date(e.date).getDate()-1] += e.amount); const max = Math.max(...daily, 10);
             const svg = document.getElementById('spendingChart'); const w = svg.clientWidth || 300; const h = 128; const step = w / (days-1);
             let pts = ""; let area = `0,${h} `;
             daily.forEach((val, i) => { const x = i * step; const y = h - ((val/max) * (h*0.8)); pts += `${x},${y} `; area += `${x},${y} `; });

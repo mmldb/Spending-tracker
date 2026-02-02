@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
     
-    <title>SpendTracker 1.5</title>
+    <title>SpendTracker 1.5.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -378,7 +378,7 @@
                 } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
                 const count = counts[cat] || 0;
                 
-                // --- NEW: SHARE % ---
+                // --- VISIBLE SHARE % ---
                 const share = grandTotal > 0 ? Math.round((amt / grandTotal) * 100) : 0;
 
                 return `
@@ -387,7 +387,7 @@
                     <div class="item-content">
                         <div class="flex items-center">
                             <span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span>
-                            <span class="opacity-50 ml-1 text-[9px] font-bold">(${count}) &middot; ${share}%</span>
+                            <span class="text-zinc-400 ml-2 text-[10px] font-bold">(${count}) — ${share}%</span>
                             ${pillHTML}
                         </div>
                         <span class="text-md font-black tabular-nums">${Math.round(amt).toLocaleString('hu-HU')} Ft</span>

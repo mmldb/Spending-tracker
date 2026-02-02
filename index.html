@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
     
-    <title>SpendTracker 1.3.3</title>
+    <title>SpendTracker 1.4</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -19,12 +19,8 @@
             -webkit-tap-highlight-color: transparent; 
             min-height: 100vh; display: flex; flex-direction: column; 
             font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow-x: hidden;
-            
-            /* DISABLE SELECT & CALLOUTS GLOBALLY */
             -webkit-user-select: none; user-select: none;
             -webkit-touch-callout: none;
-            
-            /* PADDING FOR NOTCH/ISLAND */
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
         }
@@ -83,7 +79,6 @@
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
 
         .hidden { display: none !important; }
-        /* IMPORTANT: Allow text selection ONLY in inputs */
         input { -webkit-user-select: text; user-select: text; }
         input::placeholder { color: #333; }
         .spinner { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; }
@@ -185,43 +180,106 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxZGR5dWhjZGRxZGR2aXllc3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk5NzkxMTYsImV4cCI6MjA4NTU1NTExNn0.nYWIsAnfDFvR4JtujfstvFXyaEtAWgFExRFI38iEDv0';
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const PALETTE = ['#B2FF00', '#1AAEFC', '#8455EA', '#F2C94C', '#F2994A', '#EB5757', '#E0E0E0', '#00E0FF'];
+        // --- NEW: THE "ONE BLOCK" PALETTE ---
+        const BASE_PALETTE = [
+            '#FF9F1C', // 1. Orange
+            '#795548', // 2. Brown
+            '#FFD700', // 3. Yellow
+            '#D32F2F', // 4. Red
+            '#1976D2', // 5. Blue
+            '#673AB7', // 6. Purple
+            '#F8BBD0', // 7. Pink
+            '#FFF9C4', // 8. Beige
+            '#00796B', // 9. Teal
+            '#9E9E9E'  // 10. Grey
+        ];
+
         let expenses = []; let categories = []; let categoryUsage = {}; 
-        let categoryColors = JSON.parse(localStorage.getItem('categoryColors')) || {};
         let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 0;
         let viewDate = new Date(); let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditItem = null; let isSummaryMode = false; let longPressTimer;
         let selectedCatForMenu = null;
 
-        // FIXED INIT: SEQUENTIAL LOADING
         async function init() { 
-            await fetchCategories(); // Load colors FIRST
-            await fetchExpenses();   // Then load data (which uses colors)
+            await fetchCategories();
+            await fetchExpenses();
         }
         function triggerHaptic() { if (navigator.vibrate) navigator.vibrate(50); }
 
+        // --- COLOR ENGINE ---
+        
+        // 1. Generate Smart Color (Base -> Darker -> Lighter)
+        function generateSmartColor(index) {
+            const baseColor = BASE_PALETTE[index % BASE_PALETTE.length];
+            const cycle = Math.floor(index / BASE_PALETTE.length);
+            
+            if (cycle === 0) return baseColor; // Standard 10
+            
+            // Cycle 1: Darker (0.75 brightness)
+            // Cycle 2: Lighter (1.25 brightness)
+            const brightness = (cycle % 2 === 1) ? 0.75 : 1.25;
+            return adjustBrightness(baseColor, brightness);
+        }
+
+        // 2. Adjust Hex Brightness (V in HSV essentially)
+        function adjustBrightness(hex, percent) {
+            hex = hex.replace(/^\s*#|\s*$/g, '');
+            if(hex.length === 3) hex = hex.replace(/(.)/g, '$1$1');
+            let r = parseInt(hex.substr(0, 2), 16);
+            let g = parseInt(hex.substr(2, 2), 16);
+            let b = parseInt(hex.substr(4, 2), 16);
+
+            r = Math.min(255, Math.floor(r * percent));
+            g = Math.min(255, Math.floor(g * percent));
+            b = Math.min(255, Math.floor(b * percent));
+
+            return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+        }
+
+        // 3. Dynamic Text Color (Black or White based on Luminance)
+        function getContrastColor(hex) {
+            if(!hex) return '#FFFFFF';
+            hex = hex.replace(/^\s*#|\s*$/g, '');
+            if(hex.length === 3) hex = hex.replace(/(.)/g, '$1$1');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+            return (yiq >= 128) ? '#000000' : '#FFFFFF';
+        }
+
+        // 4. Safe Getter
+        function getCatColor(catName) {
+            const c = categories.find(x => x.name === catName);
+            return c ? c.color : '#333'; 
+        }
+
         // --- DB OPS ---
         async function fetchCategories() {
-            const { data, error } = await sb.from('categories').select('*');
+            const { data, error } = await sb.from('categories').select('*').order('created_at', { ascending: true });
             if(!error) {
                 categories = data || [];
-                // Self-Healing
+                // Self-Healing: Re-assign colors if they are null OR if we want to enforce the new palette
+                // (Optional: You can remove the check "!categories[i].color" if you want to FORCE reset everyone to new palette)
                 let needsUpdate = false;
                 for (let i = 0; i < categories.length; i++) {
                     if (!categories[i].color) {
-                        const newColor = PALETTE[i % PALETTE.length];
+                        const newColor = generateSmartColor(i);
                         await sb.from('categories').update({ color: newColor }).eq('id', categories[i].id);
                         categories[i].color = newColor; 
                         needsUpdate = true;
                     }
                 }
-                if(needsUpdate) console.log("Fixed missing colors");
+                if(needsUpdate) console.log("Colors updated");
                 renderCategories();
             }
         }
 
         async function addCategoryToDb(name) {
-            const newColor = PALETTE[categories.length % PALETTE.length];
+            // Determine index for color generation
+            const newIndex = categories.length; 
+            const newColor = generateSmartColor(newIndex);
+            
             const { error } = await sb.from('categories').insert([{ name, color: newColor }]);
             if (!error) await fetchCategories();
         }
@@ -230,8 +288,7 @@
             document.getElementById('loadingIndicator').classList.remove('hidden');
             await sb.from('categories').update({ name: newName }).eq('name', oldName);
             await sb.from('expenses').update({ category: newName }).eq('category', oldName);
-            await fetchCategories(); // Reload cats
-            await fetchExpenses();   // Reload expenses
+            await init(); // Full Reload
             triggerHaptic();
         }
 
@@ -240,7 +297,6 @@
             if (!error) { triggerHaptic(); await fetchCategories(); } else alert("Check connection");
         }
 
-        // ORDER: Date DESC, then ID DESC (Newest items appear top for same day)
         async function fetchExpenses() {
             document.getElementById('loadingIndicator').classList.remove('hidden');
             const { data, error } = await sb.from('expenses').select('*')
@@ -270,18 +326,12 @@
         }
 
         // --- APP LOGIC ---
-        function getCatColor(catName) {
-            const c = categories.find(x => x.name === catName);
-            return c ? c.color : '#333'; 
-        }
-
         function renderCategories() {
             const sorted = [...categories].sort((a,b) => (categoryUsage[b.name]||0) - (categoryUsage[a.name]||0));
             let activeCat = currentEditItem ? currentEditItem.category : null;
             document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
                 const activeClass = (c.name === activeCat) ? 'active-edit' : '';
-                const isBright = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(c.color);
-                const textColor = isBright ? '#000000' : '#FFFFFF';
+                const textColor = getContrastColor(c.color);
                 return `<button 
                     style="background-color: ${c.color}; color: ${textColor}; border-color: ${c.color}"
                     onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" 
@@ -302,8 +352,7 @@
 
             document.getElementById('expenseList').innerHTML = currentMonthData.map((e) => {
                 const col = getCatColor(e.category);
-                const isBright = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(col);
-                const textColor = isBright ? '#000000' : '#FFFFFF';
+                const textColor = getContrastColor(col);
                 const noteHtml = e.note ? `<span class="block text-[8px] italic font-medium opacity-80" style="color:${textColor}">${e.note}</span>` : '';
 
                 return `
@@ -403,7 +452,7 @@
             document.getElementById('focusTotalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
             document.getElementById('focusList').innerHTML = filtered.map(e => {
                 const col = getCatColor(e.category);
-                const textColor = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(col) ? '#000' : '#FFF';
+                const textColor = getContrastColor(col);
                 const noteHtml = e.note ? `<span class="block text-[8px] italic font-medium opacity-80" style="color:${textColor}">${e.note}</span>` : '';
                 return `
                 <li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}">

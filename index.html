@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>SpendTracker 1.3</title>
+    <title>SpendTracker 1.3.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -14,7 +14,6 @@
             -webkit-tap-highlight-color: transparent; 
             min-height: 100vh; display: flex; flex-direction: column; 
             font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow-x: hidden;
-            /* GLOBAL DISABLE SELECT */
             -webkit-user-select: none; user-select: none;
         }
         .app-container { max-width: 28rem; margin: 0 auto; width: 100%; padding: 1.5rem; display: flex; flex-direction: column; flex: 1; position: relative; }
@@ -45,17 +44,13 @@
         /* 3 COLUMNS GRID */
         .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex: 1; overflow-y: auto; padding-bottom: 20px; }
         
-        /* BUTTONS - FIXED FOR IOS */
+        /* BUTTONS */
         .category-btn { 
             background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; height: 60px; 
             font-weight: 800; font-size: 11px; text-transform: uppercase; 
             display: flex; align-items: center; justify-content: center; 
             transition: transform 0.1s;
-            
-            /* The Magic Fixes */
-            -webkit-touch-callout: none; /* Prevents iOS magnifying glass/menu */
-            -webkit-user-select: none;   /* Prevents text highlighting */
-            user-select: none;
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
         }
         .category-btn:active { transform: scale(0.96); }
         .category-btn.active-edit { border: 3px solid #FFFFFF !important; box-shadow: 0 0 15px rgba(255,255,255,0.5); }
@@ -77,8 +72,7 @@
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
 
         .hidden { display: none !important; }
-        /* Fix inputs to allow text selection inside them */
-        input { -webkit-user-select: text; user-select: text; } 
+        input { -webkit-user-select: text; user-select: text; }
         input::placeholder { color: #333; }
         .spinner { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -191,14 +185,12 @@
         function triggerHaptic() { if (navigator.vibrate) navigator.vibrate(50); }
 
         // --- DB OPS ---
-        
-        // FETCH CATEGORIES + SELF HEAL COLORS
         async function fetchCategories() {
             const { data, error } = await sb.from('categories').select('*');
             if(!error) {
                 categories = data || [];
                 
-                // Self-Healing: Check for null colors
+                // Self-Healing
                 let needsUpdate = false;
                 for (let i = 0; i < categories.length; i++) {
                     if (!categories[i].color) {
@@ -209,7 +201,6 @@
                     }
                 }
                 if(needsUpdate) console.log("Fixed missing colors");
-                
                 renderCategories();
             }
         }
@@ -233,9 +224,13 @@
             if (!error) { triggerHaptic(); await fetchCategories(); } else alert("Check connection");
         }
 
+        // UPDATED: Order by Date DESC, then ID DESC (Newest items appear top for same day)
         async function fetchExpenses() {
             document.getElementById('loadingIndicator').classList.remove('hidden');
-            const { data, error } = await sb.from('expenses').select('*').order('date', { ascending: false });
+            const { data, error } = await sb.from('expenses').select('*')
+                .order('date', { ascending: false })
+                .order('id', { ascending: false }); // Secondary Sort: ID Descending
+                
             if(!error) { 
                 expenses = data || []; 
                 categoryUsage = {}; expenses.forEach(e => categoryUsage[e.category] = (categoryUsage[e.category] || 0) + 1);
@@ -267,12 +262,10 @@
         function renderCategories() {
             const sorted = [...categories].sort((a,b) => (categoryUsage[b.name]||0) - (categoryUsage[a.name]||0));
             let activeCat = currentEditItem ? currentEditItem.category : null;
-            
             document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
                 const activeClass = (c.name === activeCat) ? 'active-edit' : '';
                 const isBright = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(c.color);
                 const textColor = isBright ? '#000000' : '#FFFFFF';
-                
                 return `<button 
                     style="background-color: ${c.color}; color: ${textColor}; border-color: ${c.color}"
                     onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" 
@@ -284,10 +277,12 @@
 
         function renderAll() {
             document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            // Data is already sorted by DB (Date DESC, ID DESC)
             const currentMonthData = expenses.filter(e => {
                 const d = new Date(e.date);
                 return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
             }); 
+            
             const total = currentMonthData.reduce((sum, e) => sum + e.amount, 0);
             document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
 
@@ -389,7 +384,7 @@
             const filtered = expenses.filter(e => {
                 const d = new Date(e.date);
                 return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && e.category === cat;
-            }).sort((a,b) => b.date - a.date);
+            }).sort((a,b) => b.date - a.date || b.id - a.id); // Tie-break with ID
             const total = filtered.reduce((s,e) => s + e.amount, 0);
             document.getElementById('focusTotalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
             document.getElementById('focusList').innerHTML = filtered.map(e => {

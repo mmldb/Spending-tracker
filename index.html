@@ -42,7 +42,18 @@
         
         /* 3 COLUMNS GRID */
         .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex: 1; overflow-y: auto; padding-bottom: 20px; }
-        .category-btn { background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; height: 60px; font-weight: 800; font-size: 11px; text-transform: uppercase; display: flex; align-items: center; justify-content: center; user-select: none; }
+        
+        /* FIXED BUTTON STYLES FOR IOS */
+        .category-btn { 
+            background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; height: 60px; 
+            font-weight: 800; font-size: 11px; text-transform: uppercase; 
+            display: flex; align-items: center; justify-content: center; 
+            
+            /* The Fix: Prevent Text Selection & Callouts */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none; 
+        }
         .category-btn:active { background: #333; border-color: #fff; }
         .category-btn.active-edit { background: #FFFFFF !important; color: #000000 !important; border-color: #FFFFFF !important; box-shadow: 0 0 15px rgba(255,255,255,0.3); }
 
@@ -151,9 +162,9 @@
     <div id="catModal" class="modal-overlay hidden">
         <div class="bg-[#1c1c1e] w-64 p-6 rounded-2xl border border-zinc-800 text-center">
             <h3 id="catModalTitle" class="text-white font-black uppercase tracking-widest mb-6 text-sm">Options</h3>
-            <button onclick="handleRename()" class="w-full bg-white text-black font-bold py-3 rounded-xl mb-3 text-xs uppercase">Rename</button>
-            <button onclick="handleDeleteCat()" class="w-full bg-red-900/20 text-red-500 font-bold py-3 rounded-xl mb-3 text-xs uppercase">Delete</button>
-            <button onclick="closeCatModal()" class="w-full text-zinc-500 font-bold py-3 text-xs uppercase">Cancel</button>
+            <button onclick="handleRename()" class="w-full bg-white text-black font-bold py-3 rounded-xl mb-3 text-xs uppercase" style="-webkit-user-select:none;">Rename</button>
+            <button onclick="handleDeleteCat()" class="w-full bg-red-900/20 text-red-500 font-bold py-3 rounded-xl mb-3 text-xs uppercase" style="-webkit-user-select:none;">Delete</button>
+            <button onclick="closeCatModal()" class="w-full text-zinc-500 font-bold py-3 text-xs uppercase" style="-webkit-user-select:none;">Cancel</button>
         </div>
     </div>
 
@@ -183,18 +194,13 @@
             const { error } = await sb.from('categories').insert([{ name }]);
             if (!error) await fetchCategories();
         }
-        // GLOBAL RENAME
         async function renameCategoryDb(oldName, newName) {
             document.getElementById('loadingIndicator').classList.remove('hidden');
-            // 1. Update Category Table
             await sb.from('categories').update({ name: newName }).eq('name', oldName);
-            // 2. Update Expenses Table
             await sb.from('expenses').update({ category: newName }).eq('category', oldName);
-            
-            await Promise.all([fetchCategories(), fetchExpenses()]); // Refresh all
+            await Promise.all([fetchCategories(), fetchExpenses()]);
             triggerHaptic();
         }
-        // DELETE
         async function deleteCategoryFromDb(name) {
             const { error } = await sb.from('categories').delete().eq('name', name);
             if (!error) { triggerHaptic(); await fetchCategories(); } else alert("Check connection");
@@ -252,7 +258,7 @@
             document.getElementById('noteInput').value = item.note || ''; openInputMode(false); 
         }
 
-        // --- NEW: CATEGORY MODAL LOGIC ---
+        // --- MODAL ---
         function startLongPress(catName) {
             longPressTimer = setTimeout(() => { selectedCatForMenu = catName; openCatModal(); }, 800);
         }
@@ -267,29 +273,23 @@
         
         function handleRename() {
             const newName = prompt("New Name:", selectedCatForMenu);
-            if(newName && newName !== selectedCatForMenu) {
-                renameCategoryDb(selectedCatForMenu, newName);
-                closeCatModal();
-            }
+            if(newName && newName !== selectedCatForMenu) { renameCategoryDb(selectedCatForMenu, newName); closeCatModal(); }
         }
         function handleDeleteCat() {
             if(confirm(`Delete "${selectedCatForMenu}"?`)) { deleteCategoryFromDb(selectedCatForMenu); closeCatModal(); }
         }
 
-        // --- NEW: FOCUS VIEW LOGIC ---
+        // --- FOCUS ---
         function openFocusView(cat) {
             document.getElementById('summaryView').classList.add('hidden');
             document.getElementById('focusView').classList.remove('hidden');
             document.getElementById('focusHeaderLabel').innerText = `${viewDate.toLocaleString('en-US', { month: 'long' })} - ${cat}`;
-            
             const filtered = expenses.filter(e => {
                 const d = new Date(e.date);
                 return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && e.category === cat;
             }).sort((a,b) => b.date - a.date);
-
             const total = filtered.reduce((s,e) => s + e.amount, 0);
             document.getElementById('focusTotalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
-
             document.getElementById('focusList').innerHTML = filtered.map(e => {
                 const col = getColor(e.category);
                 const textColor = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(col) ? '#000' : '#FFF';
@@ -301,10 +301,7 @@
                 </li>`;
             }).join('');
         }
-        function closeFocusView() {
-            document.getElementById('focusView').classList.add('hidden');
-            document.getElementById('summaryView').classList.remove('hidden');
-        }
+        function closeFocusView() { document.getElementById('focusView').classList.add('hidden'); document.getElementById('summaryView').classList.remove('hidden'); }
 
         function renderAll() {
             document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
@@ -339,7 +336,7 @@
                 return `<button 
                     onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" 
                     ontouchstart="startLongPress('${c.name}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()"
-                    onclick="saveTransaction('${c.name}')" class="category-btn ${activeClass}">${c.name}</button>`;
+                    onclick="saveTransaction('${c.name}')" oncontextmenu="return false;" class="category-btn ${activeClass}">${c.name}</button>`;
             }).join('');
         }
 
@@ -389,11 +386,8 @@
         }
 
         function renderSummaryList(data, grandTotal) {
-            const totals = {}; const counts = {}; // Track counts
-            data.forEach(e => {
-                totals[e.category] = (totals[e.category] || 0) + e.amount;
-                counts[e.category] = (counts[e.category] || 0) + 1;
-            });
+            const totals = {}; const counts = {}; 
+            data.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; counts[e.category] = (counts[e.category] || 0) + 1; });
             const sorted = Object.entries(totals).sort((a,b) => b[1] - a[1]);
             const { prevExpenses } = getComparisonData();
             const prevTotals = {}; prevExpenses.forEach(e => prevTotals[e.category] = (prevTotals[e.category] || 0) + e.amount);
@@ -409,19 +403,12 @@
                     else if (diff > 0) pillHTML = `<span class="pill pill-bad ml-2">↑ ${Math.abs(p)}%</span>`;
                     else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
                 } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
-
-                // Add Count Display
                 const count = counts[cat] || 0;
-
                 return `
                 <li onclick="openFocusView('${cat}')" class="stack-item" style="background: #000; border-color: #333;">
                     <div class="summary-fill" style="width: 0%; background-color: ${col};" data-width="${pct}%"></div>
                     <div class="item-content">
-                        <div class="flex items-center">
-                            <span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span>
-                            <span class="opacity-50 ml-1 text-[9px] font-bold">(${count})</span>
-                            ${pillHTML}
-                        </div>
+                        <div class="flex items-center"><span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span><span class="opacity-50 ml-1 text-[9px] font-bold">(${count})</span>${pillHTML}</div>
                         <span class="text-md font-black tabular-nums">${Math.round(amt).toLocaleString('hu-HU')} Ft</span>
                     </div></li>`;
             }).join('');
@@ -434,7 +421,6 @@
             document.getElementById('controlGrid').classList.toggle('hidden', isSummaryMode);
             document.getElementById('activityView').classList.toggle('hidden', isSummaryMode);
             document.getElementById('summaryView').classList.toggle('hidden', !isSummaryMode);
-            // Hide Focus view if toggling main view
             document.getElementById('focusView').classList.add('hidden');
             if(isSummaryMode) renderAll();
         }

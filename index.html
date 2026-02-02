@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
     
-    <title>SpendTracker 1.4</title>
+    <title>SpendTracker 1.4.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -180,7 +180,7 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxZGR5dWhjZGRxZGR2aXllc3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk5NzkxMTYsImV4cCI6MjA4NTU1NTExNn0.nYWIsAnfDFvR4JtujfstvFXyaEtAWgFExRFI38iEDv0';
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // --- NEW: THE "ONE BLOCK" PALETTE ---
+        // --- PALETTE ---
         const BASE_PALETTE = [
             '#FF9F1C', // 1. Orange
             '#795548', // 2. Brown
@@ -207,36 +207,26 @@
         function triggerHaptic() { if (navigator.vibrate) navigator.vibrate(50); }
 
         // --- COLOR ENGINE ---
-        
-        // 1. Generate Smart Color (Base -> Darker -> Lighter)
         function generateSmartColor(index) {
             const baseColor = BASE_PALETTE[index % BASE_PALETTE.length];
             const cycle = Math.floor(index / BASE_PALETTE.length);
-            
-            if (cycle === 0) return baseColor; // Standard 10
-            
-            // Cycle 1: Darker (0.75 brightness)
-            // Cycle 2: Lighter (1.25 brightness)
+            if (cycle === 0) return baseColor; 
             const brightness = (cycle % 2 === 1) ? 0.75 : 1.25;
             return adjustBrightness(baseColor, brightness);
         }
 
-        // 2. Adjust Hex Brightness (V in HSV essentially)
         function adjustBrightness(hex, percent) {
             hex = hex.replace(/^\s*#|\s*$/g, '');
             if(hex.length === 3) hex = hex.replace(/(.)/g, '$1$1');
             let r = parseInt(hex.substr(0, 2), 16);
             let g = parseInt(hex.substr(2, 2), 16);
             let b = parseInt(hex.substr(4, 2), 16);
-
             r = Math.min(255, Math.floor(r * percent));
             g = Math.min(255, Math.floor(g * percent));
             b = Math.min(255, Math.floor(b * percent));
-
             return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
         }
 
-        // 3. Dynamic Text Color (Black or White based on Luminance)
         function getContrastColor(hex) {
             if(!hex) return '#FFFFFF';
             hex = hex.replace(/^\s*#|\s*$/g, '');
@@ -248,7 +238,6 @@
             return (yiq >= 128) ? '#000000' : '#FFFFFF';
         }
 
-        // 4. Safe Getter
         function getCatColor(catName) {
             const c = categories.find(x => x.name === catName);
             return c ? c.color : '#333'; 
@@ -259,27 +248,29 @@
             const { data, error } = await sb.from('categories').select('*').order('created_at', { ascending: true });
             if(!error) {
                 categories = data || [];
-                // Self-Healing: Re-assign colors if they are null OR if we want to enforce the new palette
-                // (Optional: You can remove the check "!categories[i].color" if you want to FORCE reset everyone to new palette)
+                
+                // --- STRICT COLOR ENFORCEMENT ---
+                // This checks every category. If the saved color doesn't match the new palette, it forces an update.
                 let needsUpdate = false;
                 for (let i = 0; i < categories.length; i++) {
-                    if (!categories[i].color) {
-                        const newColor = generateSmartColor(i);
-                        await sb.from('categories').update({ color: newColor }).eq('id', categories[i].id);
-                        categories[i].color = newColor; 
+                    const expectedColor = generateSmartColor(i);
+                    // Standardize hex for comparison (lowercase)
+                    if (!categories[i].color || categories[i].color.toLowerCase() !== expectedColor.toLowerCase()) {
+                        console.log(`Fixing color for ${categories[i].name}`);
+                        await sb.from('categories').update({ color: expectedColor }).eq('id', categories[i].id);
+                        categories[i].color = expectedColor; 
                         needsUpdate = true;
                     }
                 }
-                if(needsUpdate) console.log("Colors updated");
+                if(needsUpdate) console.log("Palette Enforced");
+                
                 renderCategories();
             }
         }
 
         async function addCategoryToDb(name) {
-            // Determine index for color generation
             const newIndex = categories.length; 
             const newColor = generateSmartColor(newIndex);
-            
             const { error } = await sb.from('categories').insert([{ name, color: newColor }]);
             if (!error) await fetchCategories();
         }
@@ -288,7 +279,7 @@
             document.getElementById('loadingIndicator').classList.remove('hidden');
             await sb.from('categories').update({ name: newName }).eq('name', oldName);
             await sb.from('expenses').update({ category: newName }).eq('category', oldName);
-            await init(); // Full Reload
+            await init(); 
             triggerHaptic();
         }
 

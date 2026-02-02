@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>SpendTracker 1.2</title>
+    <title>SpendTracker 1.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -14,6 +14,8 @@
             -webkit-tap-highlight-color: transparent; 
             min-height: 100vh; display: flex; flex-direction: column; 
             font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow-x: hidden;
+            /* GLOBAL DISABLE SELECT */
+            -webkit-user-select: none; user-select: none;
         }
         .app-container { max-width: 28rem; margin: 0 auto; width: 100%; padding: 1.5rem; display: flex; flex-direction: column; flex: 1; position: relative; }
         
@@ -43,19 +45,20 @@
         /* 3 COLUMNS GRID */
         .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex: 1; overflow-y: auto; padding-bottom: 20px; }
         
-        /* FIXED BUTTON STYLES FOR IOS */
+        /* BUTTONS - FIXED FOR IOS */
         .category-btn { 
             background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; height: 60px; 
             font-weight: 800; font-size: 11px; text-transform: uppercase; 
             display: flex; align-items: center; justify-content: center; 
+            transition: transform 0.1s;
             
-            /* The Fix: Prevent Text Selection & Callouts */
-            -webkit-user-select: none;
+            /* The Magic Fixes */
+            -webkit-touch-callout: none; /* Prevents iOS magnifying glass/menu */
+            -webkit-user-select: none;   /* Prevents text highlighting */
             user-select: none;
-            -webkit-touch-callout: none; 
         }
-        .category-btn:active { background: #333; border-color: #fff; }
-        .category-btn.active-edit { background: #FFFFFF !important; color: #000000 !important; border-color: #FFFFFF !important; box-shadow: 0 0 15px rgba(255,255,255,0.3); }
+        .category-btn:active { transform: scale(0.96); }
+        .category-btn.active-edit { border: 3px solid #FFFFFF !important; box-shadow: 0 0 15px rgba(255,255,255,0.5); }
 
         /* VISUALS */
         .pill { font-size: 10px; font-weight: 900; padding: 3px 6px; border-radius: 6px; text-transform: uppercase; }
@@ -74,6 +77,8 @@
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
 
         .hidden { display: none !important; }
+        /* Fix inputs to allow text selection inside them */
+        input { -webkit-user-select: text; user-select: text; } 
         input::placeholder { color: #333; }
         .spinner { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -186,14 +191,35 @@
         function triggerHaptic() { if (navigator.vibrate) navigator.vibrate(50); }
 
         // --- DB OPS ---
+        
+        // FETCH CATEGORIES + SELF HEAL COLORS
         async function fetchCategories() {
             const { data, error } = await sb.from('categories').select('*');
-            if(!error) { categories = data || []; renderCategories(); }
+            if(!error) {
+                categories = data || [];
+                
+                // Self-Healing: Check for null colors
+                let needsUpdate = false;
+                for (let i = 0; i < categories.length; i++) {
+                    if (!categories[i].color) {
+                        const newColor = PALETTE[i % PALETTE.length];
+                        await sb.from('categories').update({ color: newColor }).eq('id', categories[i].id);
+                        categories[i].color = newColor; 
+                        needsUpdate = true;
+                    }
+                }
+                if(needsUpdate) console.log("Fixed missing colors");
+                
+                renderCategories();
+            }
         }
+
         async function addCategoryToDb(name) {
-            const { error } = await sb.from('categories').insert([{ name }]);
+            const newColor = PALETTE[categories.length % PALETTE.length];
+            const { error } = await sb.from('categories').insert([{ name, color: newColor }]);
             if (!error) await fetchCategories();
         }
+
         async function renameCategoryDb(oldName, newName) {
             document.getElementById('loadingIndicator').classList.remove('hidden');
             await sb.from('categories').update({ name: newName }).eq('name', oldName);
@@ -201,10 +227,12 @@
             await Promise.all([fetchCategories(), fetchExpenses()]);
             triggerHaptic();
         }
+
         async function deleteCategoryFromDb(name) {
             const { error } = await sb.from('categories').delete().eq('name', name);
             if (!error) { triggerHaptic(); await fetchCategories(); } else alert("Check connection");
         }
+
         async function fetchExpenses() {
             document.getElementById('loadingIndicator').classList.remove('hidden');
             const { data, error } = await sb.from('expenses').select('*').order('date', { ascending: false });
@@ -215,12 +243,14 @@
             }
             document.getElementById('loadingIndicator').classList.add('hidden');
         }
+
         async function saveToDb(cat, amt, date, note, id = null) {
             document.getElementById('loadingIndicator').classList.remove('hidden');
             const payload = { category: cat, amount: amt, date: date, note: note || null };
             const { error } = id ? await sb.from('expenses').update(payload).eq('id', id) : await sb.from('expenses').insert([payload]);
             if (error) alert("Save failed"); else { triggerHaptic(); await fetchExpenses(); }
         }
+
         async function deleteFromDb(id) {
             if(!confirm("Delete?")) return;
             document.getElementById('loadingIndicator').classList.remove('hidden');
@@ -228,7 +258,153 @@
             if(!error) { triggerHaptic(); await fetchExpenses(); }
         }
 
-        // --- UI ---
+        // --- APP LOGIC ---
+        function getCatColor(catName) {
+            const c = categories.find(x => x.name === catName);
+            return c ? c.color : '#333'; 
+        }
+
+        function renderCategories() {
+            const sorted = [...categories].sort((a,b) => (categoryUsage[b.name]||0) - (categoryUsage[a.name]||0));
+            let activeCat = currentEditItem ? currentEditItem.category : null;
+            
+            document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
+                const activeClass = (c.name === activeCat) ? 'active-edit' : '';
+                const isBright = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(c.color);
+                const textColor = isBright ? '#000000' : '#FFFFFF';
+                
+                return `<button 
+                    style="background-color: ${c.color}; color: ${textColor}; border-color: ${c.color}"
+                    onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" 
+                    ontouchstart="startLongPress('${c.name}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()"
+                    onclick="saveTransaction('${c.name}')" oncontextmenu="return false;" 
+                    class="category-btn ${activeClass}">${c.name}</button>`;
+            }).join('');
+        }
+
+        function renderAll() {
+            document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            const currentMonthData = expenses.filter(e => {
+                const d = new Date(e.date);
+                return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
+            }); 
+            const total = currentMonthData.reduce((sum, e) => sum + e.amount, 0);
+            document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
+
+            document.getElementById('expenseList').innerHTML = currentMonthData.map((e) => {
+                const col = getCatColor(e.category);
+                const isBright = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(col);
+                const textColor = isBright ? '#000000' : '#FFFFFF';
+                const noteHtml = e.note ? `<span class="block text-[8px] italic font-medium opacity-80" style="color:${textColor}">${e.note}</span>` : '';
+
+                return `
+                <li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}">
+                    <div class="flex flex-col leading-tight">
+                        <span class="text-xs font-black uppercase tracking-tight">${e.category}</span>
+                        ${noteHtml}
+                        <span class="text-[8px] font-bold uppercase opacity-70">${new Date(e.date).toLocaleDateString('hu-HU')}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-black text-sm tabular-nums">${Math.round(e.amount).toLocaleString('hu-HU')}</span>
+                        <button onclick="event.stopPropagation(); deleteFromDb(${e.id})" class="text-lg px-2 opacity-40 hover:opacity-100">×</button>
+                    </div>
+                </li>`;
+            }).join('');
+
+            updateControlGrid(total, currentMonthData);
+            if(isSummaryMode) renderSummaryList(currentMonthData, total);
+        }
+
+        function renderSummaryList(data, grandTotal) {
+            const totals = {}; const counts = {}; 
+            data.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; counts[e.category] = (counts[e.category] || 0) + 1; });
+            const sorted = Object.entries(totals).sort((a,b) => b[1] - a[1]);
+            const { prevExpenses } = getComparisonData();
+            const prevTotals = {}; prevExpenses.forEach(e => prevTotals[e.category] = (prevTotals[e.category] || 0) + e.amount);
+
+            document.getElementById('summaryList').innerHTML = sorted.map(([cat, amt]) => {
+                const col = getCatColor(cat);
+                const pct = grandTotal > 0 ? (amt / grandTotal * 100).toFixed(0) : 0;
+                const prevAmt = prevTotals[cat] || 0;
+                let pillHTML = "";
+                if (prevAmt > 0) {
+                    const diff = amt - prevAmt; const p = ((diff / prevAmt) * 100).toFixed(0);
+                    if (diff < 0) pillHTML = `<span class="pill pill-good ml-2">↓ ${Math.abs(p)}%</span>`;
+                    else if (diff > 0) pillHTML = `<span class="pill pill-bad ml-2">↑ ${Math.abs(p)}%</span>`;
+                    else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
+                } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
+                const count = counts[cat] || 0;
+                return `
+                <li onclick="openFocusView('${cat}')" class="stack-item" style="background: #000; border-color: #333;">
+                    <div class="summary-fill" style="width: 0%; background-color: ${col};" data-width="${pct}%"></div>
+                    <div class="item-content">
+                        <div class="flex items-center"><span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span><span class="opacity-50 ml-1 text-[9px] font-bold">(${count})</span>${pillHTML}</div>
+                        <span class="text-md font-black tabular-nums">${Math.round(amt).toLocaleString('hu-HU')} Ft</span>
+                    </div></li>`;
+            }).join('');
+            setTimeout(() => { document.querySelectorAll('.summary-fill').forEach(el => el.style.width = el.getAttribute('data-width')); }, 50);
+            renderGraph(data);
+        }
+
+        function updateControlGrid(currentTotal, currentMonthData) {
+            const budgetLabel = document.getElementById('budgetLeftLabel');
+            const waterlineContainer = document.getElementById('waterlineContainer');
+            if (budgetLimit > 0) {
+                const left = budgetLimit - currentTotal;
+                budgetLabel.innerText = `${left.toLocaleString('hu-HU')} Ft`;
+                budgetLabel.style.color = left < 0 ? '#f87171' : '#FFFFFF';
+            } else { budgetLabel.innerText = "TAP TO SET"; }
+
+            waterlineContainer.innerHTML = ''; 
+            if (budgetLimit > 0 && currentTotal > 0) {
+                const catTotals = {}; currentMonthData.forEach(e => { catTotals[e.category] = (catTotals[e.category] || 0) + e.amount; });
+                for (const [cat, amt] of Object.entries(catTotals)) {
+                    const widthPct = (amt / budgetLimit) * 100;
+                    const segment = document.createElement('div');
+                    segment.style.width = `${widthPct}%`; segment.style.backgroundColor = getCatColor(cat); segment.style.height = '100%';
+                    waterlineContainer.appendChild(segment);
+                }
+            } else {
+                const emptyBar = document.createElement('div'); emptyBar.style.width = '0%'; emptyBar.style.backgroundColor = '#333'; waterlineContainer.appendChild(emptyBar);
+            }
+            
+            const { prevTotal } = getComparisonData();
+            const compContainer = document.getElementById('comparisonContainer');
+            if (prevTotal > 0) {
+                const diff = currentTotal - prevTotal;
+                const pct = ((diff / prevTotal) * 100).toFixed(0);
+                if (diff < 0) compContainer.innerHTML = `<span class="pill pill-good">↓ ${Math.abs(pct)}%</span>`;
+                else if (diff > 0) compContainer.innerHTML = `<span class="pill pill-bad">↑ ${Math.abs(pct)}%</span>`;
+                else compContainer.innerHTML = `<span class="pill pill-neutral">=</span>`;
+            } else { 
+                if (currentTotal > 0) compContainer.innerHTML = `<span class="pill pill-neutral">NEW</span>`;
+                else compContainer.innerHTML = `<span class="pill pill-neutral">--</span>`;
+            }
+        }
+
+        function openFocusView(cat) {
+            document.getElementById('summaryView').classList.add('hidden');
+            document.getElementById('focusView').classList.remove('hidden');
+            document.getElementById('focusHeaderLabel').innerText = `${viewDate.toLocaleString('en-US', { month: 'long' })} - ${cat}`;
+            const filtered = expenses.filter(e => {
+                const d = new Date(e.date);
+                return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && e.category === cat;
+            }).sort((a,b) => b.date - a.date);
+            const total = filtered.reduce((s,e) => s + e.amount, 0);
+            document.getElementById('focusTotalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
+            document.getElementById('focusList').innerHTML = filtered.map(e => {
+                const col = getCatColor(e.category);
+                const textColor = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(col) ? '#000' : '#FFF';
+                const noteHtml = e.note ? `<span class="block text-[8px] italic font-medium opacity-80" style="color:${textColor}">${e.note}</span>` : '';
+                return `
+                <li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}">
+                    <div class="flex flex-col leading-tight"><span class="text-xs font-black uppercase tracking-tight">${e.category}</span>${noteHtml}<span class="text-[8px] font-bold uppercase opacity-70">${new Date(e.date).toLocaleDateString('hu-HU')}</span></div>
+                    <div class="flex items-center gap-2"><span class="font-black text-sm tabular-nums">${Math.round(e.amount).toLocaleString('hu-HU')}</span><button onclick="event.stopPropagation(); deleteFromDb(${e.id})" class="text-lg px-2 opacity-40 hover:opacity-100">×</button></div>
+                </li>`;
+            }).join('');
+        }
+
+        // Standard Functions
         function openInputMode(isNew = true) {
             document.getElementById('inputOverlay').classList.remove('hidden');
             const scroller = document.getElementById('dateScrollerWrapper');
@@ -257,125 +433,14 @@
             document.getElementById('amountInput').value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
             document.getElementById('noteInput').value = item.note || ''; openInputMode(false); 
         }
-
-        // --- MODAL ---
-        function startLongPress(catName) {
-            longPressTimer = setTimeout(() => { selectedCatForMenu = catName; openCatModal(); }, 800);
-        }
+        function startLongPress(catName) { longPressTimer = setTimeout(() => { selectedCatForMenu = catName; openCatModal(); }, 800); }
         function cancelLongPress() { clearTimeout(longPressTimer); }
-        
-        function openCatModal() {
-            triggerHaptic();
-            document.getElementById('catModalTitle').innerText = selectedCatForMenu;
-            document.getElementById('catModal').classList.remove('hidden');
-        }
+        function openCatModal() { triggerHaptic(); document.getElementById('catModalTitle').innerText = selectedCatForMenu; document.getElementById('catModal').classList.remove('hidden'); }
         function closeCatModal() { document.getElementById('catModal').classList.add('hidden'); selectedCatForMenu = null; }
-        
-        function handleRename() {
-            const newName = prompt("New Name:", selectedCatForMenu);
-            if(newName && newName !== selectedCatForMenu) { renameCategoryDb(selectedCatForMenu, newName); closeCatModal(); }
-        }
-        function handleDeleteCat() {
-            if(confirm(`Delete "${selectedCatForMenu}"?`)) { deleteCategoryFromDb(selectedCatForMenu); closeCatModal(); }
-        }
-
-        // --- FOCUS ---
-        function openFocusView(cat) {
-            document.getElementById('summaryView').classList.add('hidden');
-            document.getElementById('focusView').classList.remove('hidden');
-            document.getElementById('focusHeaderLabel').innerText = `${viewDate.toLocaleString('en-US', { month: 'long' })} - ${cat}`;
-            const filtered = expenses.filter(e => {
-                const d = new Date(e.date);
-                return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && e.category === cat;
-            }).sort((a,b) => b.date - a.date);
-            const total = filtered.reduce((s,e) => s + e.amount, 0);
-            document.getElementById('focusTotalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
-            document.getElementById('focusList').innerHTML = filtered.map(e => {
-                const col = getColor(e.category);
-                const textColor = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(col) ? '#000' : '#FFF';
-                const noteHtml = e.note ? `<span class="block text-[8px] italic font-medium opacity-80" style="color:${textColor}">${e.note}</span>` : '';
-                return `
-                <li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}">
-                    <div class="flex flex-col leading-tight"><span class="text-xs font-black uppercase tracking-tight">${e.category}</span>${noteHtml}<span class="text-[8px] font-bold uppercase opacity-70">${new Date(e.date).toLocaleDateString('hu-HU')}</span></div>
-                    <div class="flex items-center gap-2"><span class="font-black text-sm tabular-nums">${Math.round(e.amount).toLocaleString('hu-HU')}</span><button onclick="event.stopPropagation(); deleteFromDb(${e.id})" class="text-lg px-2 opacity-40 hover:opacity-100">×</button></div>
-                </li>`;
-            }).join('');
-        }
+        function handleRename() { const newName = prompt("New Name:", selectedCatForMenu); if(newName && newName !== selectedCatForMenu) { renameCategoryDb(selectedCatForMenu, newName); closeCatModal(); } }
+        function handleDeleteCat() { if(confirm(`Delete "${selectedCatForMenu}"?`)) { deleteCategoryFromDb(selectedCatForMenu); closeCatModal(); } }
         function closeFocusView() { document.getElementById('focusView').classList.add('hidden'); document.getElementById('summaryView').classList.remove('hidden'); }
-
-        function renderAll() {
-            document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            const currentMonthData = expenses.filter(e => {
-                const d = new Date(e.date);
-                return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
-            }); 
-            const total = currentMonthData.reduce((sum, e) => sum + e.amount, 0);
-            document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
-
-            document.getElementById('expenseList').innerHTML = currentMonthData.map((e) => {
-                const col = getColor(e.category);
-                const textColor = ['#B2FF00', '#F2C94C', '#F2994A', '#E0E0E0', '#00E0FF', '#1AAEFC'].includes(col) ? '#000' : '#FFF';
-                const noteHtml = e.note ? `<span class="block text-[8px] italic font-medium opacity-80" style="color:${textColor}">${e.note}</span>` : '';
-                return `
-                <li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}">
-                    <div class="flex flex-col leading-tight"><span class="text-xs font-black uppercase tracking-tight">${e.category}</span>${noteHtml}<span class="text-[8px] font-bold uppercase opacity-70">${new Date(e.date).toLocaleDateString('hu-HU')}</span></div>
-                    <div class="flex items-center gap-2"><span class="font-black text-sm tabular-nums">${Math.round(e.amount).toLocaleString('hu-HU')}</span><button onclick="event.stopPropagation(); deleteFromDb(${e.id})" class="text-lg px-2 opacity-40 hover:opacity-100">×</button></div>
-                </li>`;
-            }).join('');
-
-            updateControlGrid(total, currentMonthData);
-            if(isSummaryMode) renderSummaryList(currentMonthData, total);
-        }
         function editById(id) { const item = expenses.find(e => e.id === id); if(item) editItem(item); }
-
-        function renderCategories() {
-            const sorted = [...categories].sort((a,b) => (categoryUsage[b.name]||0) - (categoryUsage[a.name]||0));
-            let activeCat = currentEditItem ? currentEditItem.category : null;
-            document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
-                const activeClass = (c.name === activeCat) ? 'active-edit' : '';
-                return `<button 
-                    onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" 
-                    ontouchstart="startLongPress('${c.name}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()"
-                    onclick="saveTransaction('${c.name}')" oncontextmenu="return false;" class="category-btn ${activeClass}">${c.name}</button>`;
-            }).join('');
-        }
-
-        function updateControlGrid(currentTotal, currentMonthData) {
-            const budgetLabel = document.getElementById('budgetLeftLabel');
-            const waterlineContainer = document.getElementById('waterlineContainer');
-            if (budgetLimit > 0) {
-                const left = budgetLimit - currentTotal;
-                budgetLabel.innerText = `${left.toLocaleString('hu-HU')} Ft`;
-                budgetLabel.style.color = left < 0 ? '#f87171' : '#FFFFFF';
-            } else { budgetLabel.innerText = "TAP TO SET"; }
-
-            waterlineContainer.innerHTML = ''; 
-            if (budgetLimit > 0 && currentTotal > 0) {
-                const catTotals = {}; currentMonthData.forEach(e => { catTotals[e.category] = (catTotals[e.category] || 0) + e.amount; });
-                for (const [cat, amt] of Object.entries(catTotals)) {
-                    const widthPct = (amt / budgetLimit) * 100;
-                    const segment = document.createElement('div');
-                    segment.style.width = `${widthPct}%`; segment.style.backgroundColor = getColor(cat); segment.style.height = '100%';
-                    waterlineContainer.appendChild(segment);
-                }
-            } else {
-                const emptyBar = document.createElement('div'); emptyBar.style.width = '0%'; emptyBar.style.backgroundColor = '#333'; waterlineContainer.appendChild(emptyBar);
-            }
-
-            const { prevTotal } = getComparisonData();
-            const compContainer = document.getElementById('comparisonContainer');
-            if (prevTotal > 0) {
-                const diff = currentTotal - prevTotal;
-                const pct = ((diff / prevTotal) * 100).toFixed(0);
-                if (diff < 0) compContainer.innerHTML = `<span class="pill pill-good">↓ ${Math.abs(pct)}%</span>`;
-                else if (diff > 0) compContainer.innerHTML = `<span class="pill pill-bad">↑ ${Math.abs(pct)}%</span>`;
-                else compContainer.innerHTML = `<span class="pill pill-neutral">=</span>`;
-            } else { 
-                if (currentTotal > 0) compContainer.innerHTML = `<span class="pill pill-neutral">NEW</span>`;
-                else compContainer.innerHTML = `<span class="pill pill-neutral">--</span>`;
-            }
-        }
-
         function getComparisonData() {
             let compareDayLimit = 31; const now = new Date();
             if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) compareDayLimit = now.getDate();
@@ -384,38 +449,6 @@
             const prevExpenses = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === prevMonthIdx && d.getFullYear() === prevYear && d.getDate() <= compareDayLimit; });
             return { prevTotal: prevExpenses.reduce((sum, e) => sum + e.amount, 0), prevExpenses };
         }
-
-        function renderSummaryList(data, grandTotal) {
-            const totals = {}; const counts = {}; 
-            data.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; counts[e.category] = (counts[e.category] || 0) + 1; });
-            const sorted = Object.entries(totals).sort((a,b) => b[1] - a[1]);
-            const { prevExpenses } = getComparisonData();
-            const prevTotals = {}; prevExpenses.forEach(e => prevTotals[e.category] = (prevTotals[e.category] || 0) + e.amount);
-
-            document.getElementById('summaryList').innerHTML = sorted.map(([cat, amt]) => {
-                const col = getColor(cat);
-                const pct = grandTotal > 0 ? (amt / grandTotal * 100).toFixed(0) : 0;
-                const prevAmt = prevTotals[cat] || 0;
-                let pillHTML = "";
-                if (prevAmt > 0) {
-                    const diff = amt - prevAmt; const p = ((diff / prevAmt) * 100).toFixed(0);
-                    if (diff < 0) pillHTML = `<span class="pill pill-good ml-2">↓ ${Math.abs(p)}%</span>`;
-                    else if (diff > 0) pillHTML = `<span class="pill pill-bad ml-2">↑ ${Math.abs(p)}%</span>`;
-                    else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
-                } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
-                const count = counts[cat] || 0;
-                return `
-                <li onclick="openFocusView('${cat}')" class="stack-item" style="background: #000; border-color: #333;">
-                    <div class="summary-fill" style="width: 0%; background-color: ${col};" data-width="${pct}%"></div>
-                    <div class="item-content">
-                        <div class="flex items-center"><span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span><span class="opacity-50 ml-1 text-[9px] font-bold">(${count})</span>${pillHTML}</div>
-                        <span class="text-md font-black tabular-nums">${Math.round(amt).toLocaleString('hu-HU')} Ft</span>
-                    </div></li>`;
-            }).join('');
-            setTimeout(() => { document.querySelectorAll('.summary-fill').forEach(el => el.style.width = el.getAttribute('data-width')); }, 50);
-            renderGraph(data);
-        }
-
         function toggleView() {
             isSummaryMode = !isSummaryMode;
             document.getElementById('controlGrid').classList.toggle('hidden', isSummaryMode);
@@ -424,8 +457,6 @@
             document.getElementById('focusView').classList.add('hidden');
             if(isSummaryMode) renderAll();
         }
-
-        function getColor(cat) { if(!categoryColors[cat]) { categoryColors[cat] = PALETTE[Object.keys(categoryColors).length % PALETTE.length]; localStorage.setItem('categoryColors', JSON.stringify(categoryColors)); } return categoryColors[cat]; }
         function syncSelectedDateToView() { const now = new Date(); if(now.getMonth() === viewDate.getMonth()) selectedTimestamp = new Date().setHours(12,0,0,0); else selectedTimestamp = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).setHours(12,0,0,0); }
         function renderDateScroller() {
             const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
@@ -449,7 +480,6 @@
             area += `${w},${h}`;
             svg.innerHTML = `<defs><linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="white" stop-opacity="0.2"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" class="chart-area" /><polyline points="${pts}" class="chart-line" />`;
         }
-
         document.getElementById('amountInput').addEventListener('input', (e) => { e.target.value = Number(e.target.value.replace(/[^0-9]/g, '')).toLocaleString('hu-HU').replace(/,/g,' '); });
         window.changeMonth = (d) => { viewDate.setMonth(viewDate.getMonth()+d); init(); };
         window.jumpToToday = () => { viewDate = new Date(); init(); };

@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.1.0</title>
+    <title>SpendTracker 2.2.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -118,7 +118,10 @@
                 <div class="p-4 bg-[#1c1c1e] rounded-3xl border border-zinc-800 mb-8">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Trend</h3>
-                        <span id="trendAvgLabel" class="text-[9px] font-bold uppercase text-zinc-400">Daily Avg: --</span>
+                        <div id="trendHeader" class="text-right">
+                             <span id="trendAvgLabel" class="block text-[9px] font-bold uppercase text-zinc-400">AVG: --</span>
+                             <span id="trendProjLabel" class="block text-[9px] font-bold uppercase text-zinc-600">EST: --</span>
+                        </div>
                     </div>
                     <div class="h-32 w-full flex items-end">
                         <svg id="spendingChart" class="w-full h-full overflow-visible" preserveAspectRatio="none"></svg>
@@ -137,7 +140,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.1.0</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.2.0</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -323,33 +326,36 @@
             renderGraph(data);
         }
 
-        // --- NEW GRAPH LOGIC FOR AVERAGE ---
+        // --- UPDATED GRAPH WITH PROJECTION ---
         function renderGraph(data) {
             const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
             const daily = new Array(daysInMonth).fill(0);
             let total = 0;
             data.forEach(e => { daily[new Date(e.date).getDate() - 1] += e.amount; total += e.amount; });
 
-            // Calculate Avg
+            // Calculate Avg & Projection
             const now = new Date();
             let daysPassed = daysInMonth;
             if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) {
                 daysPassed = now.getDate();
             }
             if (viewDate > now) daysPassed = 0;
+            
             const avg = daysPassed > 0 ? total / daysPassed : 0;
+            const daysRemaining = daysInMonth - daysPassed;
+            const projected = total + (avg * daysRemaining);
 
-            // Update Label
-            document.getElementById('trendAvgLabel').innerText = `Daily Avg: ${Math.round(avg).toLocaleString('hu-HU')} Ft`;
+            // Update Labels
+            document.getElementById('trendAvgLabel').innerText = `AVG: ${Math.round(avg).toLocaleString('hu-HU')} Ft / day`;
+            document.getElementById('trendProjLabel').innerText = `FORECAST: ~${Math.round(projected).toLocaleString('hu-HU')} Ft`;
 
-            // Draw
+            // Draw Chart
             const max = Math.max(...daily, avg * 1.5, 10);
             const svg = document.getElementById('spendingChart'); const w = svg.clientWidth || 300; const h = 128; const step = w / (daysInMonth - 1);
             let pts = ""; let area = `0,${h} `;
             daily.forEach((val, i) => { const x = i * step; const y = h - ((val / max) * (h * 0.8)); pts += `${x},${y} `; area += `${x},${y} `; });
             area += `${w},${h}`;
             
-            // Dotted Line Y pos
             const avgY = h - ((avg / max) * (h * 0.8));
 
             svg.innerHTML = `<defs><linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="white" stop-opacity="0.2"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient></defs>

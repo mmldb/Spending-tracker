@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.5.0</title>
+    <title>SpendTracker 2.6.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -52,13 +52,13 @@
         .item-content { position: relative; z-index: 10; width: 100%; display: flex; justify-content: space-between; align-items: center; }
         .chart-line { fill: none; stroke: #fff; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; }
         .chart-area { fill: url(#gradient); opacity: 0.3; }
+        .ghost-area { fill: #333; opacity: 0.2; } /* Style for the Ghost Graph */
         
         .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; }
         .date-scroller::-webkit-scrollbar { display: none; }
         .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
         
-        /* STAT GRID */
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px; }
         .stat-card { background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; padding: 12px 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
         .stat-label { font-size: 8px; font-weight: 800; text-transform: uppercase; color: #71717a; letter-spacing: 0.05em; margin-bottom: 2px; }
@@ -130,13 +130,16 @@
 
                 <div class="p-4 bg-[#1c1c1e] rounded-3xl border border-zinc-800 mb-8">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Trend</h3>
-                        <div id="trendHeader" class="text-right">
-                             </div>
+                        <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Trend (Ghost: Last Month)</h3>
                     </div>
                     <div class="h-32 w-full flex items-end">
                         <svg id="spendingChart" class="w-full h-full overflow-visible" preserveAspectRatio="none"></svg>
                     </div>
+                </div>
+
+                <div class="px-2 mb-8">
+                    <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">System Integrity</h3>
+                    <div id="integrityGrid" class="flex gap-[2px] h-6 items-end w-full"></div>
                 </div>
             </div>
 
@@ -160,7 +163,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.5.0</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.6.0</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -202,6 +205,7 @@
         let viewDate = new Date(); let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditItem = null; let isSummaryMode = false; let longPressTimer; let selectedCatForMenu = null;
         let currentUser = null;
+        let previousTotalValue = 0; // For Slot Machine
 
         async function init() {
             const { data: { session } } = await sb.auth.getSession();
@@ -249,6 +253,25 @@
             return (((r * 299) + (g * 587) + (b * 114)) / 1000) >= 128 ? '#000000' : '#FFFFFF';
         }
         function getCatColor(catName) { const c = categories.find(x => x.name === catName); return c ? c.color : '#333'; }
+
+        // --- SLOT MACHINE ANIMATION ---
+        function animateValue(obj, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                // Ease-out function for better feel
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                const current = Math.floor(easeOut * (end - start) + start);
+                obj.innerText = current.toLocaleString('hu-HU').replace(/,/g, ' ') + ' Ft';
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerText = end.toLocaleString('hu-HU').replace(/,/g, ' ') + ' Ft';
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
 
         async function fetchCategories() {
             const { data, error } = await sb.from('categories').select('*').order('created_at', { ascending: true });
@@ -311,7 +334,15 @@
             document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
             const currentMonthData = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear(); }); 
             const total = currentMonthData.reduce((sum, e) => sum + e.amount, 0);
-            document.getElementById('totalDisplay').innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
+            
+            // SLOT MACHINE TRIGGER
+            const displayEl = document.getElementById('totalDisplay');
+            if (previousTotalValue !== total) {
+                animateValue(displayEl, previousTotalValue, total, 1000); // 1s duration
+                previousTotalValue = total;
+            } else {
+                displayEl.innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
+            }
 
             document.getElementById('expenseList').innerHTML = currentMonthData.map((e) => {
                 const col = getCatColor(e.category); const textColor = getContrastColor(col);
@@ -344,28 +375,82 @@
             }).join('');
             setTimeout(() => { document.querySelectorAll('.summary-fill').forEach(el => el.style.width = el.getAttribute('data-width')); }, 50);
             renderGraph(data);
+            renderIntegrity(data); // Render System Integrity
         }
 
-        // --- GRAPH WITH VERTICAL MONDAY LINES ---
+        // --- NEW: SYSTEM INTEGRITY STRIP ---
+        function renderIntegrity(data) {
+            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
+            const dailySpent = new Array(daysInMonth).fill(0);
+            data.forEach(e => dailySpent[new Date(e.date).getDate()-1] += e.amount);
+            
+            const now = new Date();
+            const isCurrentMonth = (now.getMonth() === viewDate.getMonth() && now.getFullYear() === viewDate.getFullYear());
+            const currentDay = now.getDate();
+
+            let html = '';
+            for(let i=0; i<daysInMonth; i++) {
+                const spent = dailySpent[i] > 0;
+                let bgClass = "bg-[#27272a]"; // Default (Future/Unknown)
+                
+                // Logic: 
+                // If past/today AND 0 spend -> White (Safe)
+                // If past/today AND spend -> Dark Gray (Spent)
+                // If future -> Very Dark (Unknown)
+                
+                if (isCurrentMonth) {
+                    if (i < currentDay) {
+                         bgClass = spent ? "bg-zinc-800" : "bg-white";
+                    }
+                } else if (viewDate < now) {
+                    // Past month
+                    bgClass = spent ? "bg-zinc-800" : "bg-white";
+                }
+
+                html += `<div class="flex-1 rounded-sm ${bgClass}" style="height: 100%; opacity: ${spent ? 0.4 : 1}"></div>`;
+            }
+            document.getElementById('integrityGrid').innerHTML = html;
+        }
+
         function renderGraph(data) {
             const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
             const daily = new Array(daysInMonth).fill(0);
             let total = 0;
             data.forEach(e => { daily[new Date(e.date).getDate() - 1] += e.amount; total += e.amount; });
 
-            // Calculate Avg & Projection
+            // GHOST DATA (Previous Month)
+            const { prevExpenses } = getComparisonData();
+            // We need to map previous month expenses to days 1-31 roughly
+            const ghostDaily = new Array(daysInMonth).fill(0);
+            let ghostTotal = 0;
+            prevExpenses.forEach(e => {
+                const day = new Date(e.date).getDate() - 1;
+                if (day < daysInMonth) {
+                    ghostDaily[day] += e.amount;
+                    ghostTotal += e.amount;
+                }
+            });
+
+            // Cumulative calc for Ghost Line
+            const cumulativeGhost = [];
+            let gSum = 0;
+            ghostDaily.forEach(val => { gSum += val; cumulativeGhost.push(gSum); });
+
+            // Cumulative for Main Line
+            const cumulativeMain = [];
+            let cSum = 0;
+            daily.forEach(val => { cSum += val; cumulativeMain.push(cSum); });
+
+            // Stats Logic
             const now = new Date();
             let daysPassed = daysInMonth;
-            if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) {
-                daysPassed = now.getDate();
-            }
+            if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) { daysPassed = now.getDate(); }
             if (viewDate > now) daysPassed = 0;
             
             const avg = daysPassed > 0 ? total / daysPassed : 0;
             const daysRemaining = daysInMonth - daysPassed;
             const projected = total + (avg * daysRemaining);
 
-            // Populate the new Stat Bar
             document.getElementById('summDaily').innerText = `${Math.round(avg).toLocaleString('hu-HU')} Ft`;
             document.getElementById('summForecast').innerText = `${Math.round(projected).toLocaleString('hu-HU')} Ft`;
 
@@ -378,40 +463,47 @@
                     crashDate.setDate(now.getDate() + daysLeft);
                     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                     runwayText = `${monthNames[crashDate.getMonth()]} ${crashDate.getDate()}`;
-                } else {
-                    runwayText = "0 Days";
-                }
+                } else { runwayText = "0 Days"; }
             }
             document.getElementById('summRunway').innerText = runwayText;
 
-            // Chart Setup
-            const max = Math.max(...daily, avg * 1.5, 10);
+            // DRAW CHART
+            // Max Y should be max of BOTH main and ghost so neither clips
+            const maxVal = Math.max(total, ghostTotal, projected, 10);
+            
             const svg = document.getElementById('spendingChart'); const w = svg.clientWidth || 300; const h = 128; const step = w / (daysInMonth - 1);
             let pts = ""; let area = `0,${h} `;
-            let verticalLines = ""; // New line storage
+            let ghostPts = `0,${h} `; // Start bottom left
 
-            daily.forEach((val, i) => { 
-                const x = i * step; 
-                const y = h - ((val / max) * (h * 0.8)); 
+            // Render Main Line
+            cumulativeMain.forEach((val, i) => { 
+                const x = i * step; const y = h - ((val / maxVal) * (h * 0.9)); 
                 pts += `${x},${y} `; area += `${x},${y} `; 
-                
-                // Draw line if Monday (Day 1)
-                // Note: i is 0-indexed day of month (0 = 1st). 
+            });
+            area += `${w},${h}`;
+
+            // Render Ghost Line
+            cumulativeGhost.forEach((val, i) => {
+                const x = i * step; const y = h - ((val / maxVal) * (h * 0.9));
+                ghostPts += `${x},${y} `;
+            });
+            ghostPts += `${w},${h}`; // Close loop
+
+            let verticalLines = ""; 
+            daily.forEach((_, i) => { 
+                const x = i * step; 
                 const currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), i + 1);
-                if (currentDate.getDay() === 1) { // 1 = Monday
+                if (currentDate.getDay() === 1) { 
                     verticalLines += `<line x1="${x}" y1="0" x2="${x}" y2="${h}" stroke="#333" stroke-width="1" stroke-dasharray="2,2" />`;
                 }
             });
-            area += `${w},${h}`;
-            
-            const avgY = h - ((avg / max) * (h * 0.8));
 
             svg.innerHTML = `
                 <defs><linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="white" stop-opacity="0.2"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient></defs>
                 ${verticalLines} 
+                <polygon points="${ghostPts}" class="ghost-area" />
                 <polygon points="${area}" class="chart-area" />
                 <polyline points="${pts}" class="chart-line" />
-                ${avg > 0 ? `<line x1="0" y1="${avgY}" x2="${w}" y2="${avgY}" stroke="#71717a" stroke-width="1" stroke-dasharray="4,4" />` : ''}
             `;
         }
 
@@ -455,14 +547,10 @@
             const total = filtered.reduce((s,e) => s + e.amount, 0);
             document.getElementById('focusTotalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
             
-            // STAT CALCULATIONS
             const count = filtered.length;
-            
-            // 1. Avg (Ticket)
             const avgTicket = count > 0 ? Math.round(total / count) : 0;
             document.getElementById('statTicket').innerText = avgTicket.toLocaleString('hu-HU') + ' Ft';
             
-            // 2. Freq (Pulse)
             let pulse = "--";
             if (count > 1) {
                 const newest = filtered[0].date;
@@ -473,7 +561,6 @@
             }
             document.getElementById('statPulse').innerText = pulse;
             
-            // 3. Peak (Doom)
             const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             const dayCounts = [0,0,0,0,0,0,0];
             filtered.forEach(e => dayCounts[new Date(e.date).getDay()]++);

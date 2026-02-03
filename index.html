@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.7.0</title>
+    <title>SpendTracker 2.8.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -51,8 +51,8 @@
         .summary-fill { position: absolute; top: 0; left: 0; bottom: 0; z-index: 0; opacity: 0.3; width: 0%; transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1); }
         .item-content { position: relative; z-index: 10; width: 100%; display: flex; justify-content: space-between; align-items: center; }
         
-        .chart-line { fill: none; stroke: #fff; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; }
-        .chart-line-ghost { fill: none; stroke: #555; stroke-width: 1.5px; stroke-dasharray: 4,4; stroke-linecap: round; stroke-linejoin: round; opacity: 0.7; }
+        .chart-line { fill: none; stroke: #fff; stroke-width: 2.5px; stroke-linecap: round; stroke-linejoin: round; }
+        .chart-line-ghost { fill: none; stroke: #444; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; }
         .chart-area { fill: url(#gradient); opacity: 0.3; }
         
         .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; }
@@ -121,7 +121,7 @@
                     <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Breakdown</h3>
                     <button onclick="toggleView()" class="text-[10px] font-bold uppercase tracking-widest text-white bg-zinc-900 px-3 py-2 rounded-full">Back</button>
                 </div>
-                <ul id="summaryList" class="stack-list mb-0"></ul>
+                <ul id="summaryList" class="stack-list mb-0" style="padding-bottom: 0;"></ul>
                 
                 <div class="stat-grid px-2 mb-2 mt-2">
                     <div class="stat-card"><span class="stat-label">Daily Avg</span><span id="summDaily" class="stat-value">--</span></div>
@@ -167,7 +167,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.7.0</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.8.0</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -209,8 +209,8 @@
         let viewDate = new Date(); let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditItem = null; let isSummaryMode = false; let longPressTimer; let selectedCatForMenu = null;
         let currentUser = null;
-        let previousTotalValue = null; // Changed to null for load check
-        let isFirstLoad = true; // New Flag
+        let previousTotalValue = null; 
+        let isFirstLoad = true;
 
         async function init() {
             const { data: { session } } = await sb.auth.getSession();
@@ -465,8 +465,9 @@
             }
             document.getElementById('summRunway').innerText = runwayText;
 
-            // DRAW CHART
-            const maxVal = Math.max(total, ghostTotal, projected, 10);
+            // DRAW CHART - SCALE BY MAX OF TOTALS (Ignore Forecast for Y-Axis)
+            const maxVal = Math.max(total, ghostTotal, 10);
+            
             const svg = document.getElementById('spendingChart'); const w = svg.clientWidth || 300; const h = 128; const step = w / (daysInMonth - 1);
             let pts = ""; let area = `0,${h} `;
             let ghostPts = "";
@@ -478,7 +479,7 @@
             });
             area += `${w},${h}`;
 
-            // Render Ghost Line (Just Polyline, no fill)
+            // Render Ghost Line (Polyline only)
             cumulativeGhost.forEach((val, i) => {
                 const x = i * step; const y = h - ((val / maxVal) * (h * 0.9));
                 ghostPts += `${x},${y} `;

@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 1.6</title>
+    
+    <title>SpendTracker 2.0.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -20,6 +22,8 @@
             padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
         }
         .app-container { max-width: 28rem; margin: 0 auto; width: 100%; padding: 1.5rem; display: flex; flex-direction: column; flex: 1; position: relative; }
+        
+        /* UI ELEMENTS */
         .control-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 100px 100px; gap: 8px; margin-bottom: 2rem; }
         .control-card { background: #1c1c1e; border: 1px solid #27272a; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; transition: transform 0.1s; }
         .control-card:active { transform: scale(0.98); background: #27272a; }
@@ -27,17 +31,21 @@
         .btn-add:active { background: #e4e4e7; }
         .btn-sum { color: #a1a1aa; }
         .btn-sum:active { background: #333; color: #FFF; }
+        
         .stack-list { display: flex; flex-direction: column; padding-bottom: 40px; }
         .stack-item { margin-bottom: -1px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; position: relative; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); transition: filter 0.2s; min-height: 44px; }
         .stack-item:active { filter: brightness(1.2); }
         .stack-item:first-child { border-top-left-radius: 16px; border-top-right-radius: 16px; }
         .stack-item:last-child { border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; border-bottom: 1px solid #27272a; margin-bottom: 0; }
+
         .input-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; z-index: 100; padding: 1.5rem; display: flex; flex-direction: column; padding-top: calc(1.5rem + env(safe-area-inset-top)); }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        
         .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex: 1; overflow-y: auto; padding-bottom: 20px; }
         .category-btn { background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; height: 60px; font-weight: 800; font-size: 11px; text-transform: uppercase; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
         .category-btn:active { transform: scale(0.96); }
         .category-btn.active-edit { border: 3px solid #FFFFFF !important; box-shadow: 0 0 15px rgba(255,255,255,0.5); }
+
         .pill { font-size: 10px; font-weight: 900; padding: 3px 6px; border-radius: 6px; text-transform: uppercase; }
         .pill-good { background: rgba(34, 197, 94, 0.3); color: #4ade80; }
         .pill-bad { background: rgba(239, 68, 68, 0.3); color: #f87171; }
@@ -47,10 +55,12 @@
         .item-content { position: relative; z-index: 10; width: 100%; display: flex; justify-content: space-between; align-items: center; }
         .chart-line { fill: none; stroke: #fff; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; }
         .chart-area { fill: url(#gradient); opacity: 0.3; }
+        
         .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; }
         .date-scroller::-webkit-scrollbar { display: none; }
         .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
+
         .hidden { display: none !important; }
         input { -webkit-user-select: text; user-select: text; } input::placeholder { color: #333; }
         .spinner { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; }
@@ -58,7 +68,18 @@
     </style>
 </head>
 <body class="font-sans text-sm">
-    <div class="app-container">
+    <div id="authScreen" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 hidden">
+        <h1 class="text-3xl font-black mb-2 tracking-tighter">SpendTracker</h1>
+        <p class="text-zinc-500 text-xs uppercase tracking-widest mb-8">Secure Personal Finance</p>
+        
+        <div class="w-full max-w-sm">
+            <input id="emailInput" type="email" placeholder="name@example.com" class="w-full bg-[#1c1c1e] text-white p-4 rounded-2xl mb-4 outline-none text-center font-bold placeholder-zinc-600 border border-zinc-800 focus:border-white transition-colors">
+            <button onclick="handleLogin()" class="w-full bg-white text-black font-black py-4 rounded-2xl uppercase tracking-widest text-xs hover:bg-zinc-200 transition-colors">Send Magic Link</button>
+        </div>
+        <p id="authMessage" class="mt-6 text-xs font-bold text-zinc-500 text-center"></p>
+    </div>
+
+    <div id="appUI" class="app-container hidden">
         <div class="flex justify-between items-center mb-8 px-2">
             <button onclick="changeMonth(-1)" class="text-zinc-500 text-2xl font-black p-2"><<<</button>
             <span id="currentMonthLabel" class="text-xs font-black uppercase tracking-[0.25em] text-white">JANUARY 2026</span>
@@ -116,8 +137,9 @@
             </div>
         </div>
         
-        <div class="text-center py-4">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v1.6.0</span>
+        <div class="text-center py-4 flex flex-col items-center gap-2">
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.0.1</span>
+            <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
 
@@ -157,11 +179,48 @@
         let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 0;
         let viewDate = new Date(); let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditItem = null; let isSummaryMode = false; let longPressTimer; let selectedCatForMenu = null;
+        let currentUser = null;
 
-        async function init() { await fetchCategories(); await fetchExpenses(); }
+        // --- AUTH LOGIC ---
+        async function init() {
+            const { data: { session } } = await sb.auth.getSession();
+            if (session) {
+                currentUser = session.user;
+                document.getElementById('authScreen').classList.add('hidden');
+                document.getElementById('appUI').classList.remove('hidden');
+                await fetchCategories();
+                await fetchExpenses();
+            } else {
+                document.getElementById('authScreen').classList.remove('hidden');
+                document.getElementById('appUI').classList.add('hidden');
+            }
+            
+            sb.auth.onAuthStateChange((_event, session) => {
+                if (session) {
+                    currentUser = session.user;
+                    document.getElementById('authScreen').classList.add('hidden');
+                    document.getElementById('appUI').classList.remove('hidden');
+                    fetchCategories(); fetchExpenses();
+                }
+            });
+        }
+
+        async function handleLogin() {
+            const email = document.getElementById('emailInput').value.trim();
+            if (!email) return alert("Please enter an email");
+            document.getElementById('authMessage').innerText = "Sending...";
+            const { error } = await sb.auth.signInWithOtp({ email });
+            if (error) document.getElementById('authMessage').innerText = "Error: " + error.message;
+            else document.getElementById('authMessage').innerText = "Check your email for the login link!";
+        }
+
+        async function handleLogout() {
+            await sb.auth.signOut();
+            location.reload();
+        }
+
+        // --- CORE ---
         function triggerHaptic() { if (navigator.vibrate) navigator.vibrate(50); }
-
-        // --- COLOR ---
         function generateSmartColor(index) {
             const baseColor = BASE_PALETTE[index % BASE_PALETTE.length];
             const cycle = Math.floor(index / BASE_PALETTE.length);
@@ -200,14 +259,14 @@
         }
         async function addCategoryToDb(name) {
             const newIndex = categories.length; const newColor = generateSmartColor(newIndex);
-            const { error } = await sb.from('categories').insert([{ name, color: newColor }]);
+            const { error } = await sb.from('categories').insert([{ name, color: newColor, user_id: currentUser.id }]); // Added user_id
             if (!error) await fetchCategories();
         }
         async function renameCategoryDb(oldName, newName) {
             document.getElementById('loadingIndicator').classList.remove('hidden');
             await sb.from('categories').update({ name: newName }).eq('name', oldName);
             await sb.from('expenses').update({ category: newName }).eq('category', oldName);
-            await init(); triggerHaptic();
+            await fetchCategories(); await fetchExpenses(); triggerHaptic();
         }
         async function deleteCategoryFromDb(name) {
             const { error } = await sb.from('categories').delete().eq('name', name);
@@ -225,7 +284,7 @@
         }
         async function saveToDb(cat, amt, date, note, id = null) {
             document.getElementById('loadingIndicator').classList.remove('hidden');
-            const payload = { category: cat, amount: amt, date: date, note: note || null };
+            const payload = { category: cat, amount: amt, date: date, note: note || null, user_id: currentUser.id }; // Added user_id
             const { error } = id ? await sb.from('expenses').update(payload).eq('id', id) : await sb.from('expenses').insert([payload]);
             if (error) alert("Save failed"); else { triggerHaptic(); await fetchExpenses(); }
         }
@@ -287,7 +346,6 @@
                     else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
                 } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
                 const count = counts[cat] || 0;
-                // FIXED PERCENTAGE DISPLAY
                 const share = grandTotal > 0 ? Math.round((amt / grandTotal) * 100) : 0;
 
                 return `<li onclick="openFocusView('${cat}')" class="stack-item" style="background: #000; border-color: #333;">
@@ -295,8 +353,7 @@
                     <div class="item-content">
                         <div class="flex items-center">
                             <span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span>
-                            <span class="ml-2 text-[10px] font-bold text-zinc-500">(${count})</span>
-                            <span class="ml-1 text-[10px] font-bold text-white opacity-80">· ${share}%</span>
+                            <span class="ml-2 text-[10px] font-bold text-zinc-500">(${count}) <span class="text-white opacity-60">· ${share}%</span></span>
                             ${pillHTML}
                         </div>
                         <span class="text-md font-black tabular-nums">${Math.round(amt).toLocaleString('hu-HU')} Ft</span>
@@ -306,7 +363,7 @@
             renderGraph(data);
         }
 
-        // --- HELPERS (Same as before) ---
+        // --- HELPERS ---
         function updateControlGrid(currentTotal, currentMonthData) {
             const budgetLabel = document.getElementById('budgetLeftLabel');
             const waterlineContainer = document.getElementById('waterlineContainer');
@@ -430,4 +487,3 @@
     </script>
 </body>
 </html>
-                

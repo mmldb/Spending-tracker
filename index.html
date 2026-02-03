@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
     
-    <title>SpendTracker 2.0.1</title>
+    <title>SpendTracker 2.0.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -138,7 +138,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.0.1</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.0.2</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -209,7 +209,15 @@
             const email = document.getElementById('emailInput').value.trim();
             if (!email) return alert("Please enter an email");
             document.getElementById('authMessage').innerText = "Sending...";
-            const { error } = await sb.auth.signInWithOtp({ email });
+            
+            // --- FIXED: Explicitly tell Supabase the full address ---
+            const { error } = await sb.auth.signInWithOtp({ 
+                email,
+                options: {
+                    emailRedirectTo: 'https://mmldb.github.io/Spending-tracker/'
+                }
+            });
+            
             if (error) document.getElementById('authMessage').innerText = "Error: " + error.message;
             else document.getElementById('authMessage').innerText = "Check your email for the login link!";
         }
@@ -259,7 +267,7 @@
         }
         async function addCategoryToDb(name) {
             const newIndex = categories.length; const newColor = generateSmartColor(newIndex);
-            const { error } = await sb.from('categories').insert([{ name, color: newColor, user_id: currentUser.id }]); // Added user_id
+            const { error } = await sb.from('categories').insert([{ name, color: newColor, user_id: currentUser.id }]); 
             if (!error) await fetchCategories();
         }
         async function renameCategoryDb(oldName, newName) {
@@ -284,7 +292,7 @@
         }
         async function saveToDb(cat, amt, date, note, id = null) {
             document.getElementById('loadingIndicator').classList.remove('hidden');
-            const payload = { category: cat, amount: amt, date: date, note: note || null, user_id: currentUser.id }; // Added user_id
+            const payload = { category: cat, amount: amt, date: date, note: note || null, user_id: currentUser.id }; 
             const { error } = id ? await sb.from('expenses').update(payload).eq('id', id) : await sb.from('expenses').insert([payload]);
             if (error) alert("Save failed"); else { triggerHaptic(); await fetchExpenses(); }
         }

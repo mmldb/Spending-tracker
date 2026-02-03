@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.6.0</title>
+    <title>SpendTracker 2.7.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -50,9 +50,10 @@
         .waterline-container { height: 6px; width: 100%; background: #1c1c1e; border-radius: 3px; overflow: hidden; margin-top: 12px; display: flex; }
         .summary-fill { position: absolute; top: 0; left: 0; bottom: 0; z-index: 0; opacity: 0.3; width: 0%; transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1); }
         .item-content { position: relative; z-index: 10; width: 100%; display: flex; justify-content: space-between; align-items: center; }
+        
         .chart-line { fill: none; stroke: #fff; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; }
+        .chart-line-ghost { fill: none; stroke: #555; stroke-width: 1.5px; stroke-dasharray: 4,4; stroke-linecap: round; stroke-linejoin: round; opacity: 0.7; }
         .chart-area { fill: url(#gradient); opacity: 0.3; }
-        .ghost-area { fill: #333; opacity: 0.2; } /* Style for the Ghost Graph */
         
         .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; }
         .date-scroller::-webkit-scrollbar { display: none; }
@@ -120,9 +121,9 @@
                     <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Breakdown</h3>
                     <button onclick="toggleView()" class="text-[10px] font-bold uppercase tracking-widest text-white bg-zinc-900 px-3 py-2 rounded-full">Back</button>
                 </div>
-                <ul id="summaryList" class="stack-list mb-3"></ul>
+                <ul id="summaryList" class="stack-list mb-0"></ul>
                 
-                <div class="stat-grid px-2 mb-2">
+                <div class="stat-grid px-2 mb-2 mt-2">
                     <div class="stat-card"><span class="stat-label">Daily Avg</span><span id="summDaily" class="stat-value">--</span></div>
                     <div class="stat-card"><span class="stat-label">Forecast</span><span id="summForecast" class="stat-value">--</span></div>
                     <div class="stat-card"><span class="stat-label">Safe Until</span><span id="summRunway" class="stat-value">--</span></div>
@@ -130,7 +131,7 @@
 
                 <div class="p-4 bg-[#1c1c1e] rounded-3xl border border-zinc-800 mb-8">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Trend (Ghost: Last Month)</h3>
+                        <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Trend</h3>
                     </div>
                     <div class="h-32 w-full flex items-end">
                         <svg id="spendingChart" class="w-full h-full overflow-visible" preserveAspectRatio="none"></svg>
@@ -138,7 +139,10 @@
                 </div>
 
                 <div class="px-2 mb-8">
-                    <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">System Integrity</h3>
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Zero Spend Days</h3>
+                        <span id="zeroSpendCount" class="text-[9px] font-bold text-white">0</span>
+                    </div>
                     <div id="integrityGrid" class="flex gap-[2px] h-6 items-end w-full"></div>
                 </div>
             </div>
@@ -163,7 +167,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.6.0</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.7.0</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -205,7 +209,8 @@
         let viewDate = new Date(); let selectedTimestamp = new Date().setHours(12,0,0,0);
         let currentEditItem = null; let isSummaryMode = false; let longPressTimer; let selectedCatForMenu = null;
         let currentUser = null;
-        let previousTotalValue = 0; // For Slot Machine
+        let previousTotalValue = null; // Changed to null for load check
+        let isFirstLoad = true; // New Flag
 
         async function init() {
             const { data: { session } } = await sb.auth.getSession();
@@ -260,7 +265,6 @@
             const step = (timestamp) => {
                 if (!startTimestamp) startTimestamp = timestamp;
                 const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-                // Ease-out function for better feel
                 const easeOut = 1 - Math.pow(1 - progress, 3);
                 const current = Math.floor(easeOut * (end - start) + start);
                 obj.innerText = current.toLocaleString('hu-HU').replace(/,/g, ' ') + ' Ft';
@@ -335,10 +339,14 @@
             const currentMonthData = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear(); }); 
             const total = currentMonthData.reduce((sum, e) => sum + e.amount, 0);
             
-            // SLOT MACHINE TRIGGER
+            // LOGIC: Disable roll on first load
             const displayEl = document.getElementById('totalDisplay');
-            if (previousTotalValue !== total) {
-                animateValue(displayEl, previousTotalValue, total, 1000); // 1s duration
+            if (isFirstLoad) {
+                displayEl.innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
+                previousTotalValue = total;
+                isFirstLoad = false;
+            } else if (previousTotalValue !== null && previousTotalValue !== total) {
+                animateValue(displayEl, previousTotalValue, total, 1000);
                 previousTotalValue = total;
             } else {
                 displayEl.innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
@@ -375,10 +383,10 @@
             }).join('');
             setTimeout(() => { document.querySelectorAll('.summary-fill').forEach(el => el.style.width = el.getAttribute('data-width')); }, 50);
             renderGraph(data);
-            renderIntegrity(data); // Render System Integrity
+            renderIntegrity(data); 
         }
 
-        // --- NEW: SYSTEM INTEGRITY STRIP ---
+        // --- ZERO SPEND DAYS LOGIC ---
         function renderIntegrity(data) {
             const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
             const dailySpent = new Array(daysInMonth).fill(0);
@@ -387,29 +395,27 @@
             const now = new Date();
             const isCurrentMonth = (now.getMonth() === viewDate.getMonth() && now.getFullYear() === viewDate.getFullYear());
             const currentDay = now.getDate();
+            let zeroSpendCount = 0;
 
             let html = '';
             for(let i=0; i<daysInMonth; i++) {
                 const spent = dailySpent[i] > 0;
-                let bgClass = "bg-[#27272a]"; // Default (Future/Unknown)
-                
-                // Logic: 
-                // If past/today AND 0 spend -> White (Safe)
-                // If past/today AND spend -> Dark Gray (Spent)
-                // If future -> Very Dark (Unknown)
+                let bgClass = "bg-[#27272a]"; // Default Future
                 
                 if (isCurrentMonth) {
                     if (i < currentDay) {
+                         if (!spent) zeroSpendCount++;
                          bgClass = spent ? "bg-zinc-800" : "bg-white";
                     }
                 } else if (viewDate < now) {
-                    // Past month
+                    if (!spent) zeroSpendCount++;
                     bgClass = spent ? "bg-zinc-800" : "bg-white";
                 }
 
                 html += `<div class="flex-1 rounded-sm ${bgClass}" style="height: 100%; opacity: ${spent ? 0.4 : 1}"></div>`;
             }
             document.getElementById('integrityGrid').innerHTML = html;
+            document.getElementById('zeroSpendCount').innerText = zeroSpendCount;
         }
 
         function renderGraph(data) {
@@ -420,28 +426,21 @@
 
             // GHOST DATA (Previous Month)
             const { prevExpenses } = getComparisonData();
-            // We need to map previous month expenses to days 1-31 roughly
             const ghostDaily = new Array(daysInMonth).fill(0);
             let ghostTotal = 0;
             prevExpenses.forEach(e => {
                 const day = new Date(e.date).getDate() - 1;
-                if (day < daysInMonth) {
-                    ghostDaily[day] += e.amount;
-                    ghostTotal += e.amount;
-                }
+                if (day < daysInMonth) { ghostDaily[day] += e.amount; ghostTotal += e.amount; }
             });
 
-            // Cumulative calc for Ghost Line
-            const cumulativeGhost = [];
-            let gSum = 0;
+            // Cumulative Arrays
+            const cumulativeGhost = []; let gSum = 0;
             ghostDaily.forEach(val => { gSum += val; cumulativeGhost.push(gSum); });
 
-            // Cumulative for Main Line
-            const cumulativeMain = [];
-            let cSum = 0;
+            const cumulativeMain = []; let cSum = 0;
             daily.forEach(val => { cSum += val; cumulativeMain.push(cSum); });
 
-            // Stats Logic
+            // Stats
             const now = new Date();
             let daysPassed = daysInMonth;
             if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) { daysPassed = now.getDate(); }
@@ -459,8 +458,7 @@
                 const remaining = budgetLimit - total;
                 if (remaining > 0) {
                     const daysLeft = remaining / avg;
-                    const crashDate = new Date(); 
-                    crashDate.setDate(now.getDate() + daysLeft);
+                    const crashDate = new Date(); crashDate.setDate(now.getDate() + daysLeft);
                     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                     runwayText = `${monthNames[crashDate.getMonth()]} ${crashDate.getDate()}`;
                 } else { runwayText = "0 Days"; }
@@ -468,12 +466,10 @@
             document.getElementById('summRunway').innerText = runwayText;
 
             // DRAW CHART
-            // Max Y should be max of BOTH main and ghost so neither clips
             const maxVal = Math.max(total, ghostTotal, projected, 10);
-            
             const svg = document.getElementById('spendingChart'); const w = svg.clientWidth || 300; const h = 128; const step = w / (daysInMonth - 1);
             let pts = ""; let area = `0,${h} `;
-            let ghostPts = `0,${h} `; // Start bottom left
+            let ghostPts = "";
 
             // Render Main Line
             cumulativeMain.forEach((val, i) => { 
@@ -482,12 +478,11 @@
             });
             area += `${w},${h}`;
 
-            // Render Ghost Line
+            // Render Ghost Line (Just Polyline, no fill)
             cumulativeGhost.forEach((val, i) => {
                 const x = i * step; const y = h - ((val / maxVal) * (h * 0.9));
                 ghostPts += `${x},${y} `;
             });
-            ghostPts += `${w},${h}`; // Close loop
 
             let verticalLines = ""; 
             daily.forEach((_, i) => { 
@@ -497,13 +492,16 @@
                     verticalLines += `<line x1="${x}" y1="0" x2="${x}" y2="${h}" stroke="#333" stroke-width="1" stroke-dasharray="2,2" />`;
                 }
             });
+            
+            const avgY = h - ((avg / maxVal) * (h * 0.9));
 
             svg.innerHTML = `
                 <defs><linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="white" stop-opacity="0.2"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient></defs>
                 ${verticalLines} 
-                <polygon points="${ghostPts}" class="ghost-area" />
+                <polyline points="${ghostPts}" class="chart-line-ghost" />
                 <polygon points="${area}" class="chart-area" />
                 <polyline points="${pts}" class="chart-line" />
+                ${avg > 0 ? `<line x1="0" y1="${avgY}" x2="${w}" y2="${avgY}" stroke="#71717a" stroke-width="1" stroke-dasharray="4,4" />` : ''}
             `;
         }
 

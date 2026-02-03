@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.4.0</title>
+    <title>SpendTracker 2.5.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -58,7 +58,7 @@
         .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
         
-        /* NEW STAT GRID STYLE */
+        /* STAT GRID */
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px; }
         .stat-card { background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; padding: 12px 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
         .stat-label { font-size: 8px; font-weight: 800; text-transform: uppercase; color: #71717a; letter-spacing: 0.05em; margin-bottom: 2px; }
@@ -120,16 +120,20 @@
                     <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Breakdown</h3>
                     <button onclick="toggleView()" class="text-[10px] font-bold uppercase tracking-widest text-white bg-zinc-900 px-3 py-2 rounded-full">Back</button>
                 </div>
-                <ul id="summaryList" class="stack-list mb-8"></ul>
+                <ul id="summaryList" class="stack-list mb-3"></ul>
                 
                 <div class="stat-grid px-2 mb-2">
                     <div class="stat-card"><span class="stat-label">Daily Avg</span><span id="summDaily" class="stat-value">--</span></div>
                     <div class="stat-card"><span class="stat-label">Forecast</span><span id="summForecast" class="stat-value">--</span></div>
-                    <div class="stat-card"><span class="stat-label">Runway</span><span id="summRunway" class="stat-value">--</span></div>
+                    <div class="stat-card"><span class="stat-label">Safe Until</span><span id="summRunway" class="stat-value">--</span></div>
                 </div>
 
                 <div class="p-4 bg-[#1c1c1e] rounded-3xl border border-zinc-800 mb-8">
-                    <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-4">Trend</h3>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Trend</h3>
+                        <div id="trendHeader" class="text-right">
+                             </div>
+                    </div>
                     <div class="h-32 w-full flex items-end">
                         <svg id="spendingChart" class="w-full h-full overflow-visible" preserveAspectRatio="none"></svg>
                     </div>
@@ -156,7 +160,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.4.0</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.5.0</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -342,7 +346,7 @@
             renderGraph(data);
         }
 
-        // --- UPDATED GRAPH & STAT BAR ---
+        // --- GRAPH WITH VERTICAL MONDAY LINES ---
         function renderGraph(data) {
             const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
             const daily = new Array(daysInMonth).fill(0);
@@ -380,18 +384,35 @@
             }
             document.getElementById('summRunway').innerText = runwayText;
 
-            // Draw Chart
+            // Chart Setup
             const max = Math.max(...daily, avg * 1.5, 10);
             const svg = document.getElementById('spendingChart'); const w = svg.clientWidth || 300; const h = 128; const step = w / (daysInMonth - 1);
             let pts = ""; let area = `0,${h} `;
-            daily.forEach((val, i) => { const x = i * step; const y = h - ((val / max) * (h * 0.8)); pts += `${x},${y} `; area += `${x},${y} `; });
+            let verticalLines = ""; // New line storage
+
+            daily.forEach((val, i) => { 
+                const x = i * step; 
+                const y = h - ((val / max) * (h * 0.8)); 
+                pts += `${x},${y} `; area += `${x},${y} `; 
+                
+                // Draw line if Monday (Day 1)
+                // Note: i is 0-indexed day of month (0 = 1st). 
+                const currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), i + 1);
+                if (currentDate.getDay() === 1) { // 1 = Monday
+                    verticalLines += `<line x1="${x}" y1="0" x2="${x}" y2="${h}" stroke="#333" stroke-width="1" stroke-dasharray="2,2" />`;
+                }
+            });
             area += `${w},${h}`;
             
             const avgY = h - ((avg / max) * (h * 0.8));
 
-            svg.innerHTML = `<defs><linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="white" stop-opacity="0.2"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient></defs>
-            <polygon points="${area}" class="chart-area" /><polyline points="${pts}" class="chart-line" />
-            ${avg > 0 ? `<line x1="0" y1="${avgY}" x2="${w}" y2="${avgY}" stroke="#71717a" stroke-width="1" stroke-dasharray="4,4" />` : ''}`;
+            svg.innerHTML = `
+                <defs><linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="white" stop-opacity="0.2"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient></defs>
+                ${verticalLines} 
+                <polygon points="${area}" class="chart-area" />
+                <polyline points="${pts}" class="chart-line" />
+                ${avg > 0 ? `<line x1="0" y1="${avgY}" x2="${w}" y2="${avgY}" stroke="#71717a" stroke-width="1" stroke-dasharray="4,4" />` : ''}
+            `;
         }
 
         function updateControlGrid(currentTotal, currentMonthData) {

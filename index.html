@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.10.0</title>
+    <title>SpendTracker 2.11.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -60,7 +60,6 @@
         .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
         
-        /* RESTORED STAT CARDS */
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px; }
         .stat-card { background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; padding: 12px 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
         .stat-label { font-size: 8px; font-weight: 800; text-transform: uppercase; color: #71717a; letter-spacing: 0.05em; margin-bottom: 2px; }
@@ -168,7 +167,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.10.0</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.11.0</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -499,6 +498,7 @@
             `;
         }
 
+        // --- NEW CHRONOLOGICAL WATERLINE LOGIC ---
         function updateControlGrid(currentTotal, currentMonthData) {
             const budgetLabel = document.getElementById('budgetLeftLabel');
             const waterlineContainer = document.getElementById('waterlineContainer');
@@ -508,14 +508,19 @@
                 budgetLabel.style.color = left < 0 ? '#f87171' : '#FFFFFF';
             } else { budgetLabel.innerText = "TAP TO SET"; }
             waterlineContainer.innerHTML = ''; 
+            
             if (budgetLimit > 0 && currentTotal > 0) {
-                const catTotals = {}; currentMonthData.forEach(e => { catTotals[e.category] = (catTotals[e.category] || 0) + e.amount; });
-                for (const [cat, amt] of Object.entries(catTotals)) {
-                    const widthPct = (amt / budgetLimit) * 100;
+                // Sort oldest to newest for timeline effect
+                const sortedByTime = [...currentMonthData].sort((a, b) => new Date(a.date) - new Date(b.date) || a.id - b.id);
+                
+                sortedByTime.forEach(e => {
+                    const widthPct = (e.amount / budgetLimit) * 100;
                     const segment = document.createElement('div');
-                    segment.style.width = `${widthPct}%`; segment.style.backgroundColor = getCatColor(cat); segment.style.height = '100%';
+                    segment.style.width = `${widthPct}%`;
+                    segment.style.backgroundColor = getCatColor(e.category);
+                    segment.style.height = '100%';
                     waterlineContainer.appendChild(segment);
-                }
+                });
             } else {
                 const emptyBar = document.createElement('div'); emptyBar.style.width = '0%'; emptyBar.style.backgroundColor = '#333'; waterlineContainer.appendChild(emptyBar);
             }
@@ -549,7 +554,6 @@
                 const oldest = filtered[filtered.length - 1].date;
                 const diffDays = (newest - oldest) / (1000 * 60 * 60 * 24);
                 
-                // NEW PULSE LOGIC
                 if (diffDays === 0) {
                     pulse = "Same Day";
                 } else {

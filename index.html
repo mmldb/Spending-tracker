@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.8.0</title>
+    <title>SpendTracker 2.9.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -123,15 +123,15 @@
                 </div>
                 <ul id="summaryList" class="stack-list mb-0" style="padding-bottom: 0;"></ul>
                 
-                <div class="stat-grid px-2 mb-2 mt-2">
-                    <div class="stat-card"><span class="stat-label">Daily Avg</span><span id="summDaily" class="stat-value">--</span></div>
-                    <div class="stat-card"><span class="stat-label">Forecast</span><span id="summForecast" class="stat-value">--</span></div>
-                    <div class="stat-card"><span class="stat-label">Safe Until</span><span id="summRunway" class="stat-value">--</span></div>
+                <div class="stat-grid px-2 mb-0 mt-0 pt-3 border-t border-[#27272a] bg-[#1c1c1e] rounded-b-2xl">
+                    <div class="stat-card border-0 bg-transparent"><span class="stat-label">Daily Avg</span><span id="summDaily" class="stat-value">--</span></div>
+                    <div class="stat-card border-0 bg-transparent"><span class="stat-label">Forecast</span><span id="summForecast" class="stat-value">--</span></div>
+                    <div class="stat-card border-0 bg-transparent"><span class="stat-label">Safe Until</span><span id="summRunway" class="stat-value">--</span></div>
                 </div>
 
-                <div class="p-4 bg-[#1c1c1e] rounded-3xl border border-zinc-800 mb-8">
+                <div class="p-4 bg-[#1c1c1e] rounded-3xl border border-zinc-800 mb-8 mt-4">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Trend</h3>
+                        <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Trend (Daily Spikes)</h3>
                     </div>
                     <div class="h-32 w-full flex items-end">
                         <svg id="spendingChart" class="w-full h-full overflow-visible" preserveAspectRatio="none"></svg>
@@ -167,7 +167,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.8.0</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.9.0</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -424,7 +424,7 @@
             let total = 0;
             data.forEach(e => { daily[new Date(e.date).getDate() - 1] += e.amount; total += e.amount; });
 
-            // GHOST DATA (Previous Month)
+            // GHOST DATA (Previous Month DAILY)
             const { prevExpenses } = getComparisonData();
             const ghostDaily = new Array(daysInMonth).fill(0);
             let ghostTotal = 0;
@@ -432,13 +432,6 @@
                 const day = new Date(e.date).getDate() - 1;
                 if (day < daysInMonth) { ghostDaily[day] += e.amount; ghostTotal += e.amount; }
             });
-
-            // Cumulative Arrays
-            const cumulativeGhost = []; let gSum = 0;
-            ghostDaily.forEach(val => { gSum += val; cumulativeGhost.push(gSum); });
-
-            const cumulativeMain = []; let cSum = 0;
-            daily.forEach(val => { cSum += val; cumulativeMain.push(cSum); });
 
             // Stats
             const now = new Date();
@@ -465,22 +458,22 @@
             }
             document.getElementById('summRunway').innerText = runwayText;
 
-            // DRAW CHART - SCALE BY MAX OF TOTALS (Ignore Forecast for Y-Axis)
-            const maxVal = Math.max(total, ghostTotal, 10);
+            // DRAW CHART - DAILY SPIKES
+            // Max Val based on HIGHEST SINGLE DAY (not total)
+            const maxVal = Math.max(...daily, ...ghostDaily, avg * 1.5, 10);
             
             const svg = document.getElementById('spendingChart'); const w = svg.clientWidth || 300; const h = 128; const step = w / (daysInMonth - 1);
             let pts = ""; let area = `0,${h} `;
             let ghostPts = "";
 
-            // Render Main Line
-            cumulativeMain.forEach((val, i) => { 
+            // Render Main Line (White Spikes)
+            daily.forEach((val, i) => { 
                 const x = i * step; const y = h - ((val / maxVal) * (h * 0.9)); 
-                pts += `${x},${y} `; area += `${x},${y} `; 
+                pts += `${x},${y} `; 
             });
-            area += `${w},${h}`;
 
-            // Render Ghost Line (Polyline only)
-            cumulativeGhost.forEach((val, i) => {
+            // Render Ghost Line (Grey Spikes)
+            ghostDaily.forEach((val, i) => {
                 const x = i * step; const y = h - ((val / maxVal) * (h * 0.9));
                 ghostPts += `${x},${y} `;
             });
@@ -500,7 +493,6 @@
                 <defs><linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="white" stop-opacity="0.2"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient></defs>
                 ${verticalLines} 
                 <polyline points="${ghostPts}" class="chart-line-ghost" />
-                <polygon points="${area}" class="chart-area" />
                 <polyline points="${pts}" class="chart-line" />
                 ${avg > 0 ? `<line x1="0" y1="${avgY}" x2="${w}" y2="${avgY}" stroke="#71717a" stroke-width="1" stroke-dasharray="4,4" />` : ''}
             `;

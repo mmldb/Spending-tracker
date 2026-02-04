@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.9.0</title>
+    <title>SpendTracker 2.10.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -60,6 +60,7 @@
         .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; }
         .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
         
+        /* RESTORED STAT CARDS */
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px; }
         .stat-card { background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; padding: 12px 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
         .stat-label { font-size: 8px; font-weight: 800; text-transform: uppercase; color: #71717a; letter-spacing: 0.05em; margin-bottom: 2px; }
@@ -123,10 +124,10 @@
                 </div>
                 <ul id="summaryList" class="stack-list mb-0" style="padding-bottom: 0;"></ul>
                 
-                <div class="stat-grid px-2 mb-0 mt-0 pt-3 border-t border-[#27272a] bg-[#1c1c1e] rounded-b-2xl">
-                    <div class="stat-card border-0 bg-transparent"><span class="stat-label">Daily Avg</span><span id="summDaily" class="stat-value">--</span></div>
-                    <div class="stat-card border-0 bg-transparent"><span class="stat-label">Forecast</span><span id="summForecast" class="stat-value">--</span></div>
-                    <div class="stat-card border-0 bg-transparent"><span class="stat-label">Safe Until</span><span id="summRunway" class="stat-value">--</span></div>
+                <div class="stat-grid px-2 mb-2 mt-3">
+                    <div class="stat-card"><span class="stat-label">Daily Avg</span><span id="summDaily" class="stat-value">--</span></div>
+                    <div class="stat-card"><span class="stat-label">Forecast</span><span id="summForecast" class="stat-value">--</span></div>
+                    <div class="stat-card"><span class="stat-label">Safe Until</span><span id="summRunway" class="stat-value">--</span></div>
                 </div>
 
                 <div class="p-4 bg-[#1c1c1e] rounded-3xl border border-zinc-800 mb-8 mt-4">
@@ -167,7 +168,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.9.0</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.10.0</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -330,7 +331,7 @@
             let activeCat = currentEditItem ? currentEditItem.category : null;
             document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
                 const activeClass = (c.name === activeCat) ? 'active-edit' : '';
-                return `<button style="background-color: ${c.color}; color: ${getContrastColor(c.color)}; border-color: ${c.color}" onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress('${c.name}')" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()" onclick="saveTransaction('${c.name}')" oncontextmenu="return false;" class="category-btn ${activeClass}">${c.name}</button>`;
+                return `<button style="background-color: ${c.color}; color: ${getContrastColor(c.color)}; border-color: ${c.color}" onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress('${c.name}')" onmouseup="cancelLongPress()" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()" onclick="saveTransaction('${c.name}')" oncontextmenu="return false;" class="category-btn ${activeClass}">${c.name}</button>`;
             }).join('');
         }
 
@@ -547,8 +548,14 @@
                 const newest = filtered[0].date;
                 const oldest = filtered[filtered.length - 1].date;
                 const diffDays = (newest - oldest) / (1000 * 60 * 60 * 24);
-                const freq = diffDays / (count - 1);
-                pulse = freq < 1 ? "Daily" : `${freq.toFixed(1)} Days`;
+                
+                // NEW PULSE LOGIC
+                if (diffDays === 0) {
+                    pulse = "Same Day";
+                } else {
+                    const freq = diffDays / (count - 1);
+                    pulse = freq < 1 ? "Daily" : `${freq.toFixed(1)} Days`;
+                }
             }
             document.getElementById('statPulse').innerText = pulse;
             

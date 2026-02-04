@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.11.0</title>
+    <title>SpendTracker 2.12.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -145,6 +145,13 @@
                     </div>
                     <div id="integrityGrid" class="flex gap-[2px] h-6 items-end w-full"></div>
                 </div>
+
+                <div class="px-2 mb-8 flex justify-center flex-col items-center">
+                    <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-4 w-full text-left">Distribution</h3>
+                    <div class="w-48 h-48 relative">
+                        <svg id="categoryPieChart" viewBox="0 0 100 100" class="w-full h-full transform -rotate-90"></svg>
+                    </div>
+                </div>
             </div>
 
             <div id="focusView" class="hidden">
@@ -167,7 +174,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.11.0</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.12.0</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -384,6 +391,60 @@
             setTimeout(() => { document.querySelectorAll('.summary-fill').forEach(el => el.style.width = el.getAttribute('data-width')); }, 50);
             renderGraph(data);
             renderIntegrity(data); 
+            renderPieChart(data); // NEW PIE CHART
+        }
+
+        function renderPieChart(data) {
+            const totals = {};
+            let grandTotal = 0;
+            data.forEach(e => {
+                totals[e.category] = (totals[e.category] || 0) + e.amount;
+                grandTotal += e.amount;
+            });
+
+            // Sort largest to smallest for chart
+            const sortedCats = Object.entries(totals).sort((a,b) => b[1] - a[1]);
+            const svg = document.getElementById('categoryPieChart');
+            
+            if (grandTotal === 0) {
+                svg.innerHTML = '<circle cx="50" cy="50" r="40" fill="#27272a" />';
+                return;
+            }
+
+            let cumulativePercent = 0;
+            let html = '';
+
+            sortedCats.forEach(([cat, amount]) => {
+                const percent = amount / grandTotal;
+                
+                // SVG Arc math
+                const [startX, startY] = getCoordinatesForPercent(cumulativePercent);
+                cumulativePercent += percent;
+                const [endX, endY] = getCoordinatesForPercent(cumulativePercent);
+
+                const largeArcFlag = percent > 0.5 ? 1 : 0;
+                const color = getCatColor(cat);
+
+                // If single category is 100%, draw full circle
+                if (percent > 0.999) {
+                    html += `<circle cx="50" cy="50" r="40" fill="${color}" stroke="#000" stroke-width="2" />`;
+                } else {
+                    const pathData = [
+                        `M 50 50`,
+                        `L ${startX} ${startY}`,
+                        `A 40 40 0 ${largeArcFlag} 1 ${endX} ${endY}`,
+                        `Z`
+                    ].join(' ');
+                    html += `<path d="${pathData}" fill="${color}" stroke="#000" stroke-width="2" />`;
+                }
+            });
+            svg.innerHTML = html;
+        }
+
+        function getCoordinatesForPercent(percent) {
+            const x = Math.cos(2 * Math.PI * percent) * 40 + 50; 
+            const y = Math.sin(2 * Math.PI * percent) * 40 + 50; 
+            return [x, y];
         }
 
         // --- ZERO SPEND DAYS LOGIC ---
@@ -498,7 +559,6 @@
             `;
         }
 
-        // --- NEW CHRONOLOGICAL WATERLINE LOGIC ---
         function updateControlGrid(currentTotal, currentMonthData) {
             const budgetLabel = document.getElementById('budgetLeftLabel');
             const waterlineContainer = document.getElementById('waterlineContainer');
@@ -508,17 +568,13 @@
                 budgetLabel.style.color = left < 0 ? '#f87171' : '#FFFFFF';
             } else { budgetLabel.innerText = "TAP TO SET"; }
             waterlineContainer.innerHTML = ''; 
-            
             if (budgetLimit > 0 && currentTotal > 0) {
-                // Sort oldest to newest for timeline effect
+                // CHRONOLOGICAL SORT
                 const sortedByTime = [...currentMonthData].sort((a, b) => new Date(a.date) - new Date(b.date) || a.id - b.id);
-                
                 sortedByTime.forEach(e => {
                     const widthPct = (e.amount / budgetLimit) * 100;
                     const segment = document.createElement('div');
-                    segment.style.width = `${widthPct}%`;
-                    segment.style.backgroundColor = getCatColor(e.category);
-                    segment.style.height = '100%';
+                    segment.style.width = `${widthPct}%`; segment.style.backgroundColor = getCatColor(e.category); segment.style.height = '100%';
                     waterlineContainer.appendChild(segment);
                 });
             } else {

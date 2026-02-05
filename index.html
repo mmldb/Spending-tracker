@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.13.1</title>
+    <title>SpendTracker 2.14.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -77,7 +77,10 @@
         <p class="text-zinc-500 text-xs uppercase tracking-widest mb-8">Secure Personal Finance</p>
         <div class="w-full max-w-sm">
             <input id="emailInput" type="email" placeholder="name@example.com" class="w-full bg-[#1c1c1e] text-white p-4 rounded-2xl mb-4 outline-none text-center font-bold placeholder-zinc-600 border border-zinc-800 focus:border-white transition-colors">
-            <button onclick="handleLogin()" class="w-full bg-white text-black font-black py-4 rounded-2xl uppercase tracking-widest text-xs hover:bg-zinc-200 transition-colors">Send Magic Link</button>
+            
+            <input id="codeInput" type="text" inputmode="numeric" placeholder="123456" class="hidden w-full bg-[#1c1c1e] text-white p-4 rounded-2xl mb-4 outline-none text-center font-bold placeholder-zinc-600 border border-zinc-800 focus:border-white transition-colors">
+            
+            <button id="loginBtn" onclick="handleLogin()" class="w-full bg-white text-black font-black py-4 rounded-2xl uppercase tracking-widest text-xs hover:bg-zinc-200 transition-colors">Get Code</button>
         </div>
         <p id="authMessage" class="mt-6 text-xs font-bold text-zinc-500 text-center"></p>
     </div>
@@ -174,7 +177,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.13.1</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.14.0</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -218,6 +221,7 @@
         let currentUser = null;
         let previousTotalValue = null; 
         let isFirstLoad = true;
+        let loginStep = 'email'; // email or code
 
         async function init() {
             const { data: { session } } = await sb.auth.getSession();
@@ -239,22 +243,56 @@
                 }
             });
         }
+
         async function handleLogin() {
-            const email = document.getElementById('emailInput').value.trim();
-            if (!email) return alert("Please enter an email");
-            document.getElementById('authMessage').innerText = "Sending...";
-            
-            // SECURITY FIX: Explicit Redirect
-            const { error } = await sb.auth.signInWithOtp({ 
-                email,
-                options: {
-                    emailRedirectTo: 'https://mmldb.github.io/Spending-tracker'
+            const emailInput = document.getElementById('emailInput');
+            const codeInput = document.getElementById('codeInput');
+            const btn = document.getElementById('loginBtn');
+            const msg = document.getElementById('authMessage');
+
+            if (loginStep === 'email') {
+                const email = emailInput.value.trim();
+                if (!email) return alert("Please enter an email");
+                
+                msg.innerText = "Sending code...";
+                // Request OTP
+                const { error } = await sb.auth.signInWithOtp({ 
+                    email,
+                    options: { emailRedirectTo: 'https://mmldb.github.io/Spending-tracker' }
+                });
+                
+                if (error) {
+                    msg.innerText = "Error: " + error.message;
+                } else {
+                    msg.innerText = "Code sent! Check your email.";
+                    loginStep = 'code';
+                    emailInput.classList.add('hidden');
+                    codeInput.classList.remove('hidden');
+                    btn.innerText = "VERIFY CODE";
+                    codeInput.focus();
                 }
-            });
-            
-            if (error) document.getElementById('authMessage').innerText = "Error: " + error.message;
-            else document.getElementById('authMessage').innerText = "Check your email for the login link!";
+            } else {
+                // Verify Code Step
+                const email = emailInput.value.trim();
+                const token = codeInput.value.trim();
+                if (!token) return alert("Enter the code");
+                
+                msg.innerText = "Verifying...";
+                const { data, error } = await sb.auth.verifyOtp({
+                    email,
+                    token,
+                    type: 'email'
+                });
+
+                if (error) {
+                    msg.innerText = "Invalid code. Try again.";
+                } else {
+                    // Success is handled by onAuthStateChange
+                    msg.innerText = "Success!";
+                }
+            }
         }
+
         async function handleLogout() { await sb.auth.signOut(); location.reload(); }
 
         function triggerHaptic() { if (navigator.vibrate) navigator.vibrate(50); }
@@ -446,10 +484,7 @@
                 }
             });
 
-            // Inner "Hole"
             const holeHtml = `<circle cx="50" cy="50" r="32" fill="#000000" />`;
-
-            // Center Text
             const labelHtml = `
                 <text x="50" y="48" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF" font-size="12" font-weight="900" style="text-shadow: 0 2px 4px rgba(0,0,0,0.5);">${grandTotal.toLocaleString('hu-HU').replace(/,/g, ' ')}</text>
                 <text x="50" y="60" text-anchor="middle" dominant-baseline="central" fill="#71717a" font-size="6" font-weight="800" letter-spacing="0.5px">TOTAL</text>
@@ -468,7 +503,6 @@
             return [x, y];
         }
 
-        // --- ZERO SPEND DAYS LOGIC ---
         function renderIntegrity(data) {
             const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
             const dailySpent = new Array(daysInMonth).fill(0);
@@ -482,7 +516,7 @@
             let html = '';
             for(let i=0; i<daysInMonth; i++) {
                 const spent = dailySpent[i] > 0;
-                let bgClass = "bg-[#27272a]"; // Default Future
+                let bgClass = "bg-[#27272a]"; 
                 
                 if (isCurrentMonth) {
                     if (i < currentDay) {
@@ -506,7 +540,6 @@
             let total = 0;
             data.forEach(e => { daily[new Date(e.date).getDate() - 1] += e.amount; total += e.amount; });
 
-            // GHOST DATA (Previous Month DAILY)
             const { prevExpenses } = getComparisonData();
             const ghostDaily = new Array(daysInMonth).fill(0);
             let ghostTotal = 0;
@@ -515,7 +548,6 @@
                 if (day < daysInMonth) { ghostDaily[day] += e.amount; ghostTotal += e.amount; }
             });
 
-            // Stats
             const now = new Date();
             let daysPassed = daysInMonth;
             if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) { daysPassed = now.getDate(); }
@@ -540,21 +572,17 @@
             }
             document.getElementById('summRunway').innerText = runwayText;
 
-            // DRAW CHART - DAILY SPIKES
-            // Max Val based on HIGHEST SINGLE DAY (not total)
             const maxVal = Math.max(...daily, ...ghostDaily, avg * 1.5, 10);
             
             const svg = document.getElementById('spendingChart'); const w = svg.clientWidth || 300; const h = 128; const step = w / (daysInMonth - 1);
             let pts = ""; let area = `0,${h} `;
             let ghostPts = "";
 
-            // Render Main Line (White Spikes)
             daily.forEach((val, i) => { 
                 const x = i * step; const y = h - ((val / maxVal) * (h * 0.9)); 
                 pts += `${x},${y} `; 
             });
 
-            // Render Ghost Line (Grey Spikes)
             ghostDaily.forEach((val, i) => {
                 const x = i * step; const y = h - ((val / maxVal) * (h * 0.9));
                 ghostPts += `${x},${y} `;
@@ -590,7 +618,6 @@
             } else { budgetLabel.innerText = "TAP TO SET"; }
             waterlineContainer.innerHTML = ''; 
             if (budgetLimit > 0 && currentTotal > 0) {
-                // CHRONOLOGICAL SORT
                 const sortedByTime = [...currentMonthData].sort((a, b) => new Date(a.date) - new Date(b.date) || a.id - b.id);
                 sortedByTime.forEach(e => {
                     const widthPct = (e.amount / budgetLimit) * 100;

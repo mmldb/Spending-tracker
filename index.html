@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.13.0</title>
+    <title>SpendTracker 2.13.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -174,7 +174,7 @@
         </div>
         
         <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.13.0</span>
+            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.13.1</span>
             <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
         </div>
     </div>
@@ -243,7 +243,15 @@
             const email = document.getElementById('emailInput').value.trim();
             if (!email) return alert("Please enter an email");
             document.getElementById('authMessage').innerText = "Sending...";
-            const { error } = await sb.auth.signInWithOtp({ email });
+            
+            // SECURITY FIX: Explicit Redirect
+            const { error } = await sb.auth.signInWithOtp({ 
+                email,
+                options: {
+                    emailRedirectTo: 'https://mmldb.github.io' 
+                }
+            });
+            
             if (error) document.getElementById('authMessage').innerText = "Error: " + error.message;
             else document.getElementById('authMessage').innerText = "Check your email for the login link!";
         }

@@ -1083,8 +1083,17 @@
       const provider = new GoogleAuthProvider();
       $("authError").textContent = "Opening Google sign-in...";
       try {
-        await signInWithRedirect(auth, provider);
+        await signInWithPopup(auth, provider);
       } catch (error) {
+        if (error.code === "auth/popup-blocked") {
+          $("authError").textContent = "Popup blocked, trying redirect sign-in...";
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        if (error.code === "auth/popup-closed-by-user" || error.code === "auth/cancelled-popup-request") {
+          $("authError").textContent = "Google sign-in was closed before it finished.";
+          return;
+        }
         $("authError").textContent = `${error.code || "auth/error"}: ${error.message || "Google sign-in failed."}`;
       }
     });

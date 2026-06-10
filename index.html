@@ -600,6 +600,14 @@
       .replace(/\s+/g, " ")
       .trim();
     const makeId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    const hashString = (value) => {
+      let hash = 2166136261;
+      for (let i = 0; i < value.length; i++) {
+        hash ^= value.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0).toString(36);
+    };
 
     function showScreen(screenId) {
       screens.forEach((id) => $(id).classList.toggle("active", id === screenId));
@@ -699,6 +707,10 @@
       }));
       unsubscribers.push(onSnapshot(query(userCollection("rules"), orderBy("createdAt", "desc")), (snap) => {
         rules = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        renderAll();
+      }));
+      unsubscribers.push(onSnapshot(query(userCollection("pending"), orderBy("date", "desc")), (snap) => {
+        importPreview = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         renderAll();
       }));
     }
@@ -982,6 +994,27 @@
       return normalize(`${row.date} ${row.amount} ${row.currency} ${row.merchant || ""} ${row.description || ""}`);
     }
 
+    function pendingDocId(row) {
+      return hashString(makeFingerprint(row));
+    }
+
+    async function persistPendingRows(rows) {
+      const pendingRows = rows.filter((row) => row.status === "review" || row.status === "ready");
+      if (!pendingRows.length) return;
+      const batch = writeBatch(db);
+      pendingRows.forEach((row) => {
+        const fingerprint = makeFingerprint(row);
+        const ref = doc(userCollection("pending"), hashString(fingerprint));
+        batch.set(ref, {
+          ...row,
+          id: ref.id,
+          fingerprint,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      });
+      await batch.commit();
+    }
+
     function matchRule(merchant, description) {
       const target = normalize(`${merchant} ${description}`);
       return rules.find((rule) => target.includes(normalize(rule.pattern)));
@@ -1004,7 +1037,7 @@
     const DESCRIPTION_HEADERS = ["description", "details", "leiras", "leírás", "note", "message", "közlemény", "kozlemeny", "tranzakció típusa", "tranzakcio tipusa", "megnevezés", "megnevezes"];
     const CURRENCY_HEADERS = ["currency", "deviza", "ccy", "pénznem", "penznem"];
 
-    function buildPreviewFromCSV(text, fileName) {
+    async function buildPreviewFromCSV(text, fileName) {
       $("importStatus").classList.add("hidden");
       $("importStatus").textContent = "";
       const delimiter = detectDelimiter(text);
@@ -1021,6 +1054,7 @@
         }
         $("importStatus").classList.remove("hidden");
         $("importStatus").textContent = `Parsed ${importPreview.length} OTP rows. Header row: ${headerRowIndex + 1}.`;
+        await persistPendingRows(importPreview);
         renderImportPreview();
         renderReview();
         showView("importView");
@@ -1072,6 +1106,7 @@
       }
       $("importStatus").classList.remove("hidden");
       $("importStatus").textContent = `Parsed ${importPreview.length} rows using "${delimiter === "\t" ? "tab" : delimiter}" delimiter. Header row: ${headerRowIndex + 1}.`;
+      await persistPendingRows(importPreview);
       renderImportPreview();
       renderReview();
       showView("importView");
@@ -1148,20 +1183,25 @@
           const row = importPreview.find((item) => item.id === btn.dataset.reviewId);
           if (!row) return;
           if (savingReviewIds.has(row.id)) return;
-          savingReviewIds.add(row.id);
-          row.categoryId = btn.dataset.catId;
-          row.status = "saving";
+          const merchantKey = normalize(row.merchant);
+          const matchingRows = importPreview.filter((item) => item.status === "review" && normalize(item.merchant) === merchantKey);
+          matchingRows.forEach((item) => {
+            savingReviewIds.add(item.id);
+            item.categoryId = btn.dataset.catId;
+            item.status = "saving";
+          });
           renderReview();
           try {
             if (autoCreateRules) await createRuleFromRow(row);
-            const saved = await saveReviewedRow(row);
-            importPreview = importPreview.filter((item) => item.id !== row.id);
-            showToast(saved ? "Saved" : "Already imported");
+            const result = await saveReviewedRows(matchingRows, btn.dataset.catId);
+            const savedIdSet = new Set(matchingRows.map((item) => item.id));
+            importPreview = importPreview.filter((item) => !savedIdSet.has(item.id));
+            showToast(result.saved ? `Saved ${result.saved}` : "Already imported");
           } catch (error) {
-            row.status = "review";
+            matchingRows.forEach((item) => { item.status = "review"; });
             alert(`Save failed: ${error.message}`);
           } finally {
-            savingReviewIds.delete(row.id);
+            matchingRows.forEach((item) => savingReviewIds.delete(item.id));
             renderAll();
             showView(importPreview.some((item) => item.status === "review") ? "reviewView" : "importView");
           }
@@ -1199,6 +1239,22 @@
         categoryId: row.categoryId,
         createdAt: serverTimestamp()
       });
+    }
+
+    async function applyRulesToPending() {
+      const batch = writeBatch(db);
+      let changed = 0;
+      importPreview.forEach((row) => {
+        if (row.status !== "review") return;
+        const rule = matchRule(row.merchant, row.description);
+        if (!rule?.categoryId) return;
+        row.categoryId = rule.categoryId;
+        row.status = "ready";
+        batch.update(doc(userCollection("pending"), row.id), { categoryId: rule.categoryId, status: "ready", updatedAt: serverTimestamp() });
+        changed++;
+      });
+      if (changed) await batch.commit();
+      return changed;
     }
 
     function openCategoryForm(categoryId = null) {
@@ -1325,25 +1381,38 @@
       showToast(`Deleted ${deleteCount} duplicates`);
     }
 
-    async function saveReviewedRow(row) {
-      const fingerprint = makeFingerprint(row);
-      if (transactions.some((tx) => (tx.fingerprint || makeFingerprint(tx)) === fingerprint)) {
-        return false;
-      }
-      await addDoc(userCollection("transactions"), {
-        date: row.date,
-        amount: row.amount,
-        currency: row.currency,
-        direction: row.direction,
-        merchant: row.merchant,
-        description: row.description,
-        categoryId: row.categoryId,
-        source: row.source,
-        importFile: row.importFile,
-        fingerprint,
-        createdAt: serverTimestamp()
+    async function saveReviewedRows(rows, categoryId) {
+      const batch = writeBatch(db);
+      const seen = new Set(transactions.map((tx) => tx.fingerprint || makeFingerprint(tx)));
+      let saved = 0;
+      let skipped = 0;
+      rows.forEach((row) => {
+        const fingerprint = makeFingerprint(row);
+        const pendingRef = doc(userCollection("pending"), row.id || hashString(fingerprint));
+        batch.delete(pendingRef);
+        if (seen.has(fingerprint)) {
+          skipped++;
+          return;
+        }
+        seen.add(fingerprint);
+        saved++;
+        const txRef = doc(userCollection("transactions"));
+        batch.set(txRef, {
+          date: row.date,
+          amount: row.amount,
+          currency: row.currency,
+          direction: row.direction,
+          merchant: row.merchant,
+          description: row.description,
+          categoryId,
+          source: row.source,
+          importFile: row.importFile,
+          fingerprint,
+          createdAt: serverTimestamp()
+        });
       });
-      return true;
+      await batch.commit();
+      return { saved, skipped };
     }
 
     async function savePreviewRows(statuses = ["ready"]) {
@@ -1352,8 +1421,11 @@
       const batch = writeBatch(db);
       const seen = new Set(transactions.map((tx) => tx.fingerprint || makeFingerprint(tx)));
       const savedRows = [];
+      const touchedRows = [];
       rows.forEach((row) => {
         const fingerprint = makeFingerprint(row);
+        batch.delete(doc(userCollection("pending"), row.id || hashString(fingerprint)));
+        touchedRows.push(row);
         if (seen.has(fingerprint)) return;
         seen.add(fingerprint);
         savedRows.push(row);
@@ -1372,14 +1444,14 @@
           createdAt: serverTimestamp()
         });
       });
-      if (!savedRows.length) {
+      if (!touchedRows.length) {
         showToast("Already imported");
         return;
       }
       await batch.commit();
-      const savedIds = new Set(savedRows.map((row) => row.id));
+      const savedIds = new Set(touchedRows.map((row) => row.id));
       importPreview = importPreview.filter((row) => !savedIds.has(row.id));
-      showToast(`Imported ${savedRows.length}`);
+      showToast(savedRows.length ? `Imported ${savedRows.length}` : "Already imported");
       renderAll();
     }
 
@@ -1539,9 +1611,14 @@
       autoCreateRules = !autoCreateRules;
       renderReview();
     });
-    $("clearImportBtn").addEventListener("click", () => {
+    $("clearImportBtn").addEventListener("click", async () => {
+      if (importPreview.length && !confirm("Clear pending import rows?")) return;
+      const batch = writeBatch(db);
+      importPreview.forEach((row) => batch.delete(doc(userCollection("pending"), row.id || hashString(makeFingerprint(row)))));
+      await batch.commit();
       importPreview = [];
       currentImportFile = "";
+      showToast("Import cleared");
       renderAll();
     });
     $("saveReadyBtn").addEventListener("click", () => savePreviewRows(["ready"]));
@@ -1567,7 +1644,7 @@
       $("importStatus").classList.remove("hidden");
       $("importStatus").textContent = "Reading CSV...";
       try {
-        buildPreviewFromCSV(await readCsvFile(file), file.name);
+        await buildPreviewFromCSV(await readCsvFile(file), file.name);
       } catch (error) {
         importPreview = [];
         $("importSummary").classList.add("hidden");

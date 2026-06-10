@@ -609,25 +609,36 @@
         return null;
       });
       if (redirectResult?.user) {
-        $("authError").textContent = "";
+        await enterApp(redirectResult.user);
       }
       onAuthStateChanged(auth, async (user) => {
-        currentUser = user;
         cleanupListeners();
         if (!user) {
           showScreen("authScreen");
           return;
         }
-        $("authError").textContent = "";
-        showScreen("appScreen");
-        await ensureDefaults();
-        subscribeData();
+        await enterApp(user);
       });
     }
 
     function cleanupListeners() {
       unsubscribers.forEach((fn) => fn());
       unsubscribers = [];
+    }
+
+    async function enterApp(user) {
+      if (!user) return;
+      currentUser = user;
+      $("authError").textContent = "";
+      showScreen("appScreen");
+      try {
+        await ensureDefaults();
+        subscribeData();
+      } catch (error) {
+        cleanupListeners();
+        $("authError").textContent = `${error.code || "firestore/error"}: ${error.message || "Could not load Firestore data."}`;
+        showScreen("authScreen");
+      }
     }
 
     function userCollection(name) {
@@ -1083,7 +1094,9 @@
       const provider = new GoogleAuthProvider();
       $("authError").textContent = "Opening Google sign-in...";
       try {
-        await signInWithPopup(auth, provider);
+        const result = await signInWithPopup(auth, provider);
+        $("authError").textContent = "Signed in. Loading your tracker...";
+        await enterApp(result.user);
       } catch (error) {
         if (error.code === "auth/popup-blocked") {
           $("authError").textContent = "Popup blocked, trying redirect sign-in...";

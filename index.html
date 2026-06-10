@@ -887,6 +887,27 @@
       return Number(normalized) || 0;
     }
 
+    function looksLikeAmountNote(value) {
+      const key = normalize(value);
+      return /\d+[,.]\d{2}/.test(String(value || "")) && (key.includes("huf") || key.includes("vasarlas") || key.includes("purchase"));
+    }
+
+    function looksLikeBankReference(value) {
+      const text = String(value || "").trim();
+      const key = normalize(text);
+      const digitCount = (text.match(/\d/g) || []).length;
+      return !text ||
+        /^\d/.test(text) ||
+        digitCount > Math.max(8, text.length / 2) ||
+        key.includes("400322") ||
+        key.includes(" az ") ||
+        key.startsWith("az ") ||
+        key.includes("tran ideje") ||
+        key.includes("tran osszeg") ||
+        key.includes("zarolasi") ||
+        looksLikeAmountNote(text);
+    }
+
     function parseDate(value) {
       const raw = String(value || "").trim();
       if (!raw) return todayISO();
@@ -901,20 +922,9 @@
     function otpMerchant(cells) {
       const type = normalize(cells[0]);
       if (type.includes("bankkartya") || type.includes("kartya") || type.includes("zarolas")) {
-        const preferred = [cells[7], cells[8], cells[6], cells[9], cells[10]];
-        return preferred.map((cell) => String(cell || "").trim())
-          .find((cell) => {
-            const key = normalize(cell);
-            return cell &&
-              !/^\d/.test(cell) &&
-              !key.includes(" az ") &&
-              !key.startsWith("az ") &&
-              !key.includes("400322") &&
-              !key.includes("tran ideje") &&
-              !key.includes("tran osszeg") &&
-              !key.includes("zarolasi") &&
-              /[a-z]/i.test(key);
-          }) || guessMerchant(cells.join(" "));
+        return cells.slice(5, 11)
+          .map((cell) => String(cell || "").trim())
+          .find((cell) => !looksLikeBankReference(cell) && /[a-z]/i.test(normalize(cell))) || guessMerchant(cells.join(" "));
       }
       const details = String(cells[5] || "").trim();
       const payee = details.replace(/^\d+/, "").trim();
@@ -1332,6 +1342,20 @@
       setTimeout(() => URL.revokeObjectURL(url), 500);
     }
 
+    async function readCsvFile(file) {
+      const buffer = await file.arrayBuffer();
+      const utf8 = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+      const mojibakeScore = (utf8.match(/�|Ă|Ĺ|Å|��/g) || []).length;
+      if (mojibakeScore > 2) {
+        try {
+          return new TextDecoder("windows-1250").decode(buffer);
+        } catch {
+          return new TextDecoder("iso-8859-2").decode(buffer);
+        }
+      }
+      return utf8;
+    }
+
     function escapeHTML(value) {
       return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
         "&": "&amp;",
@@ -1426,7 +1450,7 @@
       $("importStatus").classList.remove("hidden");
       $("importStatus").textContent = "Reading CSV...";
       try {
-        buildPreviewFromCSV(await file.text(), file.name);
+        buildPreviewFromCSV(await readCsvFile(file), file.name);
       } catch (error) {
         importPreview = [];
         $("importSummary").classList.add("hidden");

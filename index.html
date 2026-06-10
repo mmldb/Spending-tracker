@@ -456,6 +456,14 @@
         <div class="notice mb">
           Categories are used for manual entries and CSV review. Merchant rules are learned when you review a CSV row.
         </div>
+        <div id="categoryForm" class="panel mb hidden">
+          <div class="stack">
+            <input id="categoryNameInput" class="field" type="text" placeholder="Category name">
+            <input id="categoryColorInput" class="field" type="color" value="#ffffff" style="height:52px; padding:6px;">
+            <button id="saveCategoryBtn" class="btn primary block">Save category</button>
+            <button id="cancelCategoryBtn" class="btn block">Cancel</button>
+          </div>
+        </div>
         <div id="categoryList" class="stack mb"></div>
         <div class="topbar mb">
           <span class="subtle">Merchant rules</span>
@@ -568,6 +576,7 @@
     let autoCreateRules = true;
     let editingTxId = null;
     let savingReviewIds = new Set();
+    let editingCategoryId = null;
 
     const $ = (id) => document.getElementById(id);
     const money = (value, currency = "HUF") => {
@@ -1192,13 +1201,58 @@
       });
     }
 
+    function openCategoryForm(categoryId = null) {
+      const cat = categoryId ? categories.find((item) => item.id === categoryId) : null;
+      editingCategoryId = categoryId;
+      $("categoryNameInput").value = cat?.name || "";
+      $("categoryColorInput").value = cat?.color || "#ffffff";
+      $("categoryForm").classList.remove("hidden");
+      $("categoryNameInput").focus();
+    }
+
+    function closeCategoryForm() {
+      editingCategoryId = null;
+      $("categoryForm").classList.add("hidden");
+      $("categoryNameInput").value = "";
+      $("categoryColorInput").value = "#ffffff";
+    }
+
+    async function saveCategoryFromForm() {
+      const name = $("categoryNameInput").value.trim();
+      const color = $("categoryColorInput").value || "#ffffff";
+      if (!name) {
+        showToast("Name required");
+        return;
+      }
+      $("saveCategoryBtn").disabled = true;
+      $("saveCategoryBtn").textContent = "Saving...";
+      try {
+        if (editingCategoryId) {
+          await updateDoc(doc(userCollection("categories"), editingCategoryId), { name, color });
+          showToast("Category updated");
+        } else {
+          const existing = categoryByName(name);
+          if (existing) {
+            await updateDoc(doc(userCollection("categories"), existing.id), { name, color });
+            showToast("Category updated");
+          } else {
+            await addDoc(userCollection("categories"), { name, color, createdAt: serverTimestamp() });
+            showToast("Category added");
+          }
+        }
+        closeCategoryForm();
+      } catch (error) {
+        alert(`Category save failed: ${error.message}`);
+      } finally {
+        $("saveCategoryBtn").disabled = false;
+        $("saveCategoryBtn").textContent = "Save category";
+      }
+    }
+
     async function editCategory(categoryId) {
       const cat = categories.find((item) => item.id === categoryId);
       if (!cat) return;
-      const name = prompt("Category name", cat.name);
-      if (!name) return;
-      const color = prompt("Color hex", cat.color || "#ffffff") || cat.color || "#ffffff";
-      await updateDoc(doc(userCollection("categories"), cat.id), { name: name.trim(), color });
+      openCategoryForm(cat.id);
     }
 
     async function deleteCategory(categoryId) {
@@ -1501,12 +1555,9 @@
       await deleteDoc(doc(userCollection("transactions"), editingTxId));
       closeModal();
     });
-    $("addCategoryBtn").addEventListener("click", async () => {
-      const name = prompt("Category name");
-      if (!name) return;
-      const color = prompt("Color hex", "#ffffff") || "#ffffff";
-      await addDoc(userCollection("categories"), { name, color, createdAt: serverTimestamp() });
-    });
+    $("addCategoryBtn").addEventListener("click", () => openCategoryForm());
+    $("saveCategoryBtn").addEventListener("click", saveCategoryFromForm);
+    $("cancelCategoryBtn").addEventListener("click", closeCategoryForm);
     $("dedupeCategoriesBtn").addEventListener("click", dedupeCategories);
     $("csvFileInput").addEventListener("change", async (event) => {
       const file = event.target.files?.[0];

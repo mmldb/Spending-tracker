@@ -448,12 +448,15 @@
       <section id="rulesView" class="view hidden">
         <div class="topbar mb">
           <span class="subtle">Categories & rules</span>
-          <button id="addCategoryBtn" class="btn">+ Category</button>
+          <span style="display:flex; gap:8px;">
+            <button id="dedupeCategoriesBtn" class="btn">Clean</button>
+            <button id="addCategoryBtn" class="btn">+ Category</button>
+          </span>
         </div>
         <div class="notice mb">
           Categories are used for manual entries and CSV review. Merchant rules are learned when you review a CSV row.
         </div>
-        <div id="categoryList" class="chip-row mb"></div>
+        <div id="categoryList" class="stack mb"></div>
         <div class="topbar mb">
           <span class="subtle">Merchant rules</span>
         </div>
@@ -707,6 +710,16 @@
       return categories.find((cat) => normalize(cat.name) === key);
     }
 
+    function uniqueCategories() {
+      const seen = new Set();
+      return categories.filter((cat) => {
+        const key = normalize(cat.name);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
     function renderHome() {
       const now = new Date();
       $("monthLabel").textContent = now.toLocaleDateString("hu-HU", { month: "long", year: "numeric" });
@@ -740,11 +753,28 @@
     }
 
     function renderCategories() {
-      $("categoryList").innerHTML = categories.length ? categories.map((cat) => `
-        <button class="chip" style="border-color:${cat.color};">
-          <span class="category-dot" style="background:${cat.color}"></span>${escapeHTML(cat.name)}
-        </button>
-      `).join("") : "";
+      const rows = uniqueCategories();
+      $("categoryList").innerHTML = rows.length ? rows.map((cat) => {
+        const duplicateCount = categories.filter((item) => normalize(item.name) === normalize(cat.name)).length - 1;
+        return `
+          <div class="row">
+            <span>
+              <span class="row-title"><span class="category-dot" style="background:${cat.color}"></span>${escapeHTML(cat.name)}</span>
+              <span class="row-meta">${duplicateCount > 0 ? `${duplicateCount} duplicate${duplicateCount > 1 ? "s" : ""}` : "Category"}</span>
+            </span>
+            <span style="display:flex; gap:8px;">
+              <button class="btn" data-edit-category="${cat.id}">Edit</button>
+              <button class="icon-btn" data-delete-category="${cat.id}" title="Delete">×</button>
+            </span>
+          </div>
+        `;
+      }).join("") : `<div class="empty">No categories yet.</div>`;
+      [...$("categoryList").querySelectorAll("[data-edit-category]")].forEach((btn) => {
+        btn.addEventListener("click", () => editCategory(btn.dataset.editCategory));
+      });
+      [...$("categoryList").querySelectorAll("[data-delete-category]")].forEach((btn) => {
+        btn.addEventListener("click", () => deleteCategory(btn.dataset.deleteCategory));
+      });
     }
 
     function renderRules() {
@@ -871,10 +901,19 @@
     function otpMerchant(cells) {
       const type = normalize(cells[0]);
       if (type.includes("bankkartya") || type.includes("kartya") || type.includes("zarolas")) {
-        return cells.slice(6, 11).map((cell) => String(cell || "").trim())
+        const preferred = [cells[7], cells[8], cells[6], cells[9], cells[10]];
+        return preferred.map((cell) => String(cell || "").trim())
           .find((cell) => {
             const key = normalize(cell);
-            return cell && !/^\d/.test(cell) && !key.includes(" az ") && !key.startsWith("az ") && !key.includes("tran ideje") && !key.includes("tran osszeg");
+            return cell &&
+              !/^\d/.test(cell) &&
+              !key.includes(" az ") &&
+              !key.startsWith("az ") &&
+              !key.includes("400322") &&
+              !key.includes("tran ideje") &&
+              !key.includes("tran osszeg") &&
+              !key.includes("zarolasi") &&
+              /[a-z]/i.test(key);
           }) || guessMerchant(cells.join(" "));
       }
       const details = String(cells[5] || "").trim();
@@ -1051,9 +1090,10 @@
     function renderReview() {
       $("autoRuleToggle").classList.toggle("active", autoCreateRules);
       const rows = importPreview.filter((row) => row.status === "review");
-      const categoryButtons = (row) => categories.length ? `
+      const reviewCategories = uniqueCategories();
+      const categoryButtons = (row) => reviewCategories.length ? `
         <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;" class="mt">
-          ${categories.map((cat) => `<button class="btn" style="border-color:${cat.color}; justify-content:flex-start; min-height:44px;" data-review-id="${row.id}" data-cat-id="${cat.id}"><span class="category-dot" style="background:${cat.color}"></span>${escapeHTML(cat.name)}</button>`).join("")}
+          ${reviewCategories.map((cat) => `<button class="btn" style="border-color:${cat.color}; justify-content:flex-start; min-height:44px;" data-review-id="${row.id}" data-cat-id="${cat.id}"><span class="category-dot" style="background:${cat.color}"></span>${escapeHTML(cat.name)}</button>`).join("")}
         </div>
       ` : `<div class="empty mt">No categories yet. Go to Rules -> + Category first.</div>`;
       $("reviewList").innerHTML = rows.length ? rows.map((row) => `
@@ -1116,6 +1156,61 @@
         categoryId: row.categoryId,
         createdAt: serverTimestamp()
       });
+    }
+
+    async function editCategory(categoryId) {
+      const cat = categories.find((item) => item.id === categoryId);
+      if (!cat) return;
+      const name = prompt("Category name", cat.name);
+      if (!name) return;
+      const color = prompt("Color hex", cat.color || "#ffffff") || cat.color || "#ffffff";
+      await updateDoc(doc(userCollection("categories"), cat.id), { name: name.trim(), color });
+    }
+
+    async function deleteCategory(categoryId) {
+      const cat = categories.find((item) => item.id === categoryId);
+      if (!cat) return;
+      const used = transactions.some((tx) => tx.categoryId === categoryId) || rules.some((rule) => rule.categoryId === categoryId);
+      if (used) {
+        alert("This category is used by transactions or rules. Rename it or use Clean duplicates first.");
+        return;
+      }
+      if (!confirm(`Delete "${cat.name}"?`)) return;
+      await deleteDoc(doc(userCollection("categories"), categoryId));
+    }
+
+    async function dedupeCategories() {
+      const groups = new Map();
+      categories.forEach((cat) => {
+        const key = normalize(cat.name);
+        if (!key) return;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(cat);
+      });
+      const duplicates = [...groups.values()].filter((items) => items.length > 1);
+      if (!duplicates.length) {
+        alert("No duplicate categories found.");
+        return;
+      }
+      if (!confirm(`Merge ${duplicates.length} duplicate category group(s)?`)) return;
+      const batch = writeBatch(db);
+      duplicates.forEach((items) => {
+        const canonical = items[0];
+        items.slice(1).forEach((dup) => {
+          transactions.filter((tx) => tx.categoryId === dup.id).forEach((tx) => {
+            batch.update(doc(userCollection("transactions"), tx.id), { categoryId: canonical.id });
+          });
+          rules.filter((rule) => rule.categoryId === dup.id).forEach((rule) => {
+            batch.update(doc(userCollection("rules"), rule.id), { categoryId: canonical.id });
+          });
+          importPreview.filter((row) => row.categoryId === dup.id).forEach((row) => {
+            row.categoryId = canonical.id;
+          });
+          batch.delete(doc(userCollection("categories"), dup.id));
+        });
+      });
+      await batch.commit();
+      renderAll();
     }
 
     async function saveReviewedRow(row) {
@@ -1322,6 +1417,7 @@
       const color = prompt("Color hex", "#ffffff") || "#ffffff";
       await addDoc(userCollection("categories"), { name, color, createdAt: serverTimestamp() });
     });
+    $("dedupeCategoriesBtn").addEventListener("click", dedupeCategories);
     $("csvFileInput").addEventListener("change", async (event) => {
       const file = event.target.files?.[0];
       if (!file) return;

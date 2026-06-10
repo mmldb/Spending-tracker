@@ -809,10 +809,23 @@
       return rows;
     }
 
+    function looksLikeOtpHeader(headers) {
+      if (headers.length < 6) return false;
+      const joined = normalize(headers.join(" "));
+      const weakSignals = ["tipus", "azonosito", "adatok", "kozlemeny", "erteknap"].filter((token) => joined.includes(token)).length;
+      const positionalSignals = normalize(headers[0]).includes("tip") && normalize(headers[3]).includes("azon") && normalize(headers[4]).includes("sszeg");
+      return weakSignals >= 2 || positionalSignals;
+    }
+
+    function looksLikeOtpDataRow(cells) {
+      return cells.length >= 5 && /\d{4}[./-]\d{1,2}[./-]\d{1,2}/.test(`${cells[1]} ${cells[2]}`) && Math.abs(parseAmount(cells[4])) > 0;
+    }
+
     function findHeaderRow(rows) {
       const limit = Math.min(rows.length, 25);
       for (let i = 0; i < limit; i++) {
         const headers = rows[i];
+        if (looksLikeOtpHeader(headers)) return i;
         const hasDate = headerIndex(headers, DATE_HEADERS) >= 0;
         const hasAmount = headerIndex(headers, AMOUNT_HEADERS) >= 0 || headerIndex(headers, DEBIT_HEADERS) >= 0 || headerIndex(headers, CREDIT_HEADERS) >= 0;
         if (hasDate && hasAmount) return i;
@@ -852,6 +865,21 @@
       if (hu) return `${hu[3]}-${hu[2].padStart(2, "0")}-${hu[1].padStart(2, "0")}`;
       const d = new Date(raw);
       return Number.isNaN(d.getTime()) ? todayISO() : d.toISOString().slice(0, 10);
+    }
+
+    function otpMerchant(cells) {
+      const type = normalize(cells[0]);
+      if (type.includes("bankkartya") || type.includes("kartya") || type.includes("zarolas")) {
+        return cells.slice(6, 11).map((cell) => String(cell || "").trim())
+          .find((cell) => cell && !/^\d/.test(cell) && !normalize(cell).includes("tran ideje") && !normalize(cell).includes("tran osszeg")) || guessMerchant(cells.join(" "));
+      }
+      const details = String(cells[5] || "").trim();
+      const payee = details.replace(/^\d+/, "").trim();
+      return payee || cells.slice(5, 11).find(Boolean) || guessMerchant(cells.join(" "));
+    }
+
+    function otpDescription(cells) {
+      return cells.slice(0, 11).filter(Boolean).join(" | ");
     }
 
     function makeFingerprint(row) {
@@ -897,6 +925,13 @@
         description: headerIndex(headers, DESCRIPTION_HEADERS),
         currency: headerIndex(headers, CURRENCY_HEADERS)
       };
+      if (looksLikeOtpHeader(headers) || (idx.date < 0 && rows.slice(headerRowIndex + 1, headerRowIndex + 6).some(looksLikeOtpDataRow))) {
+        idx.date = 1;
+        idx.amount = 4;
+        idx.merchant = -1;
+        idx.description = -1;
+        idx.currency = -1;
+      }
       if (idx.date < 0 || (idx.amount < 0 && idx.debit < 0 && idx.credit < 0)) {
         throw new Error(`Could not detect date and amount columns. Detected headers: ${headers.join(" | ")}`);
       }
@@ -905,13 +940,14 @@
       const debitColumn = ["paid out", "debit", "terheles", "kifizetes", "kiadas"].some((token) => amountHeader.includes(normalize(token)));
       const existing = new Set(transactions.map((tx) => tx.fingerprint).filter(Boolean));
       currentImportFile = fileName;
-      importPreview = rows.slice(headerRowIndex + 1).map((cells) => {
+      importPreview = rows.slice(headerRowIndex + 1).filter((cells) => cells.some(Boolean)).map((cells) => {
         let signedAmount = parseAmount(cells[amountIndex]);
         if (!signedAmount && idx.credit >= 0) signedAmount = parseAmount(cells[idx.credit]);
         if (!signedAmount && idx.debit >= 0) signedAmount = -Math.abs(parseAmount(cells[idx.debit]));
-        const direction = debitColumn || signedAmount < 0 ? "expense" : "income";
-        const description = cells[idx.description] || cells[idx.merchant] || "";
-        const merchant = cells[idx.merchant] || guessMerchant(description);
+        const otpRow = looksLikeOtpDataRow(cells);
+        const direction = otpRow || debitColumn || signedAmount < 0 ? "expense" : "income";
+        const description = otpRow ? otpDescription(cells) : (cells[idx.description] || cells[idx.merchant] || "");
+        const merchant = otpRow ? otpMerchant(cells) : (cells[idx.merchant] || guessMerchant(description));
         const parsed = {
           id: makeId(),
           date: parseDate(cells[idx.date]),

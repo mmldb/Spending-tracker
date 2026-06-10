@@ -1,10 +1,12 @@
 {
-  "name": "SpendTracker PWA",
+  "name": "Spend CSV",
   "short_name": "Spend",
+  "description": "Mobile-first CSV spending tracker with Firebase sync.",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "background_color": "#050505",
+  "theme_color": "#050505",
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/2845/2845705.png",

@@ -1,750 +1,1150 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hu">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="SpendTracker">
-    <title>SpendTracker 2.14.0</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        html { background-color: #000000; }
-        body { 
-            background-color: #000000; color: #FFFFFF; 
-            -webkit-tap-highlight-color: transparent; 
-            min-height: 100vh; display: flex; flex-direction: column; 
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow-x: hidden;
-            -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-            padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
-        }
-        .app-container { max-width: 28rem; margin: 0 auto; width: 100%; padding: 1.5rem; display: flex; flex-direction: column; flex: 1; position: relative; }
-        
-        .control-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 100px 100px; gap: 8px; margin-bottom: 2rem; }
-        .control-card { background: #1c1c1e; border: 1px solid #27272a; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; transition: transform 0.1s; }
-        .control-card:active { transform: scale(0.98); background: #27272a; }
-        .btn-add { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
-        .btn-add:active { background: #e4e4e7; }
-        .btn-sum { color: #a1a1aa; }
-        .btn-sum:active { background: #333; color: #FFF; }
-        
-        .stack-list { display: flex; flex-direction: column; padding-bottom: 40px; }
-        .stack-item { margin-bottom: -1px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; position: relative; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); transition: filter 0.2s; min-height: 44px; }
-        .stack-item:active { filter: brightness(1.2); }
-        .stack-item:first-child { border-top-left-radius: 16px; border-top-right-radius: 16px; }
-        .stack-item:last-child { border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; border-bottom: 1px solid #27272a; margin-bottom: 0; }
-
-        .input-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; z-index: 100; padding: 1.5rem; display: flex; flex-direction: column; padding-top: calc(1.5rem + env(safe-area-inset-top)); }
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        
-        .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex: 1; overflow-y: auto; padding-bottom: 20px; }
-        .category-btn { background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; height: 60px; font-weight: 800; font-size: 11px; text-transform: uppercase; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
-        .category-btn:active { transform: scale(0.96); }
-        .category-btn.active-edit { border: 3px solid #FFFFFF !important; box-shadow: 0 0 15px rgba(255,255,255,0.5); }
-
-        .pill { font-size: 10px; font-weight: 900; padding: 3px 6px; border-radius: 6px; text-transform: uppercase; }
-        .pill-good { background: rgba(34, 197, 94, 0.3); color: #4ade80; }
-        .pill-bad { background: rgba(239, 68, 68, 0.3); color: #f87171; }
-        .pill-neutral { background: rgba(255, 255, 255, 0.1); color: #a1a1aa; }
-        .waterline-container { height: 6px; width: 100%; background: #1c1c1e; border-radius: 3px; overflow: hidden; margin-top: 12px; display: flex; }
-        .summary-fill { position: absolute; top: 0; left: 0; bottom: 0; z-index: 0; opacity: 0.3; width: 0%; transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1); }
-        .item-content { position: relative; z-index: 10; width: 100%; display: flex; justify-content: space-between; align-items: center; }
-        
-        .chart-line { fill: none; stroke: #fff; stroke-width: 2.5px; stroke-linecap: round; stroke-linejoin: round; }
-        .chart-line-ghost { fill: none; stroke: #444; stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; }
-        .chart-area { fill: url(#gradient); opacity: 0.3; }
-        
-        .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; scroll-snap-type: x mandatory; }
-        .date-scroller::-webkit-scrollbar { display: none; }
-        .date-card { scroll-snap-align: center; flex: 0 0 60px; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1c1c1e; border-radius: 12px; border: 1px solid #27272a; }
-        .date-card.selected { background: #FFFFFF; color: #000000; border-color: #FFFFFF; }
-        
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px; }
-        .stat-card { background: #1c1c1e; border: 1px solid #27272a; border-radius: 16px; padding: 12px 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
-        .stat-label { font-size: 8px; font-weight: 800; text-transform: uppercase; color: #71717a; letter-spacing: 0.05em; margin-bottom: 2px; }
-        .stat-value { font-size: 11px; font-black; font-weight: 900; color: #FFFFFF; }
-
-        .hidden { display: none !important; }
-        input { -webkit-user-select: text; user-select: text; } input::placeholder { color: #333; }
-        .spinner { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Spend">
+  <meta name="theme-color" content="#050505">
+  <title>Spend CSV</title>
+  <link rel="manifest" href="./manifest.json">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050505;
+      --panel: #111113;
+      --panel-soft: #19191c;
+      --line: #2a2a2f;
+      --muted: #8b8b95;
+      --text: #f6f6f7;
+      --accent: #ffffff;
+      --good: #3ddc84;
+      --warn: #ffcc4d;
+      --bad: #ff5d5d;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    }
+    button, input, select, textarea { font: inherit; }
+    button { touch-action: manipulation; }
+    .app-shell {
+      width: min(100%, 520px);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 18px 16px 96px;
+    }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .brand {
+      letter-spacing: -0.04em;
+      font-weight: 950;
+      font-size: 32px;
+      line-height: 1;
+    }
+    .subtle {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 16px 0;
+    }
+    .metric {
+      min-height: 86px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .metric strong {
+      font-size: 21px;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      overflow-wrap: anywhere;
+    }
+    .btn {
+      min-height: 48px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-soft);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 14px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .btn.primary {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+    }
+    .btn.danger { color: var(--bad); }
+    .btn.block { width: 100%; }
+    .btn:disabled {
+      opacity: .45;
+      pointer-events: none;
+    }
+    .icon-btn {
+      width: 44px;
+      min-width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 950;
+    }
+    .tabs {
+      position: fixed;
+      left: 50%;
+      bottom: max(12px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      width: min(calc(100% - 24px), 496px);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      padding: 6px;
+      background: rgba(17, 17, 19, .94);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      backdrop-filter: blur(18px);
+      z-index: 50;
+    }
+    .tab {
+      height: 48px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+    .tab.active {
+      background: #fff;
+      color: #000;
+    }
+    .stack { display: flex; flex-direction: column; gap: 8px; }
+    .row {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+    .row-title {
+      font-size: 14px;
+      font-weight: 950;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+    .row-meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    .amount {
+      font-variant-numeric: tabular-nums;
+      font-size: 15px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+    .chip-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 2px 0 8px;
+      scrollbar-width: none;
+    }
+    .chip-row::-webkit-scrollbar { display: none; }
+    .chip {
+      flex: 0 0 auto;
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 12px;
+      color: var(--text);
+      background: var(--panel-soft);
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .chip.active {
+      background: #fff;
+      color: #000;
+      border-color: #fff;
+    }
+    .field {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0b0b0c;
+      color: var(--text);
+      padding: 12px;
+      outline: none;
+    }
+    textarea.field {
+      min-height: 160px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .file-drop {
+      position: relative;
+      min-height: 148px;
+      border: 1px dashed #4a4a52;
+      background: #0d0d0f;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 18px;
+    }
+    .file-drop input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+    }
+    .notice {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0d0d0f;
+      color: var(--muted);
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border-radius: 6px;
+      padding: 0 7px;
+      font-size: 10px;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      background: #24242a;
+      color: var(--muted);
+    }
+    .pill.good { color: var(--good); background: rgba(61, 220, 132, .12); }
+    .pill.warn { color: var(--warn); background: rgba(255, 204, 77, .12); }
+    .pill.bad { color: var(--bad); background: rgba(255, 93, 93, .12); }
+    .category-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 6px;
+      vertical-align: -1px;
+    }
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: none;
+      align-items: flex-end;
+      background: rgba(0,0,0,.72);
+      padding: 12px;
+    }
+    .modal.active { display: flex; }
+    .sheet {
+      width: min(100%, 520px);
+      max-height: min(86vh, 720px);
+      margin: 0 auto;
+      overflow: auto;
+      background: #101012;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .hidden { display: none !important; }
+    .mt { margin-top: 14px; }
+    .mb { margin-bottom: 14px; }
+    .empty {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px 14px;
+      color: var(--muted);
+      background: #0c0c0e;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    @media (min-width: 720px) {
+      .app-shell { padding-top: 28px; }
+      .brand { font-size: 38px; }
+    }
+  </style>
 </head>
-<body class="font-sans text-sm">
-    <div id="authScreen" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 hidden">
-        <h1 class="text-3xl font-black mb-2 tracking-tighter">SpendTracker</h1>
-        <p class="text-zinc-500 text-xs uppercase tracking-widest mb-8">Secure Personal Finance</p>
-        <div class="w-full max-w-sm">
-            <input id="emailInput" type="email" placeholder="name@example.com" class="w-full bg-[#1c1c1e] text-white p-4 rounded-2xl mb-4 outline-none text-center font-bold placeholder-zinc-600 border border-zinc-800 focus:border-white transition-colors">
-            
-            <input id="codeInput" type="text" inputmode="numeric" placeholder="123456" class="hidden w-full bg-[#1c1c1e] text-white p-4 rounded-2xl mb-4 outline-none text-center font-bold placeholder-zinc-600 border border-zinc-800 focus:border-white transition-colors">
-            
-            <button id="loginBtn" onclick="handleLogin()" class="w-full bg-white text-black font-black py-4 rounded-2xl uppercase tracking-widest text-xs hover:bg-zinc-200 transition-colors">Get Code</button>
+<body>
+  <main class="app-shell">
+    <section id="setupScreen" class="screen">
+      <div class="topbar">
+        <div>
+          <div class="brand">Spend CSV</div>
+          <div class="subtle">Firebase setup</div>
         </div>
-        <p id="authMessage" class="mt-6 text-xs font-bold text-zinc-500 text-center"></p>
+      </div>
+      <div class="panel">
+        <div class="row-title">Firebase config</div>
+        <p class="row-meta">Paste the web app config object from Firebase Console. The values are public app identifiers, not database secrets.</p>
+        <textarea id="firebaseConfigInput" class="field mt" spellcheck="false" placeholder='{
+  "apiKey": "...",
+  "authDomain": "...firebaseapp.com",
+  "projectId": "...",
+  "storageBucket": "...",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'></textarea>
+        <button id="saveConfigBtn" class="btn primary block mt">Save config</button>
+        <button id="clearConfigBtn" class="btn block mt">Clear saved config</button>
+      </div>
+      <div class="notice mt">
+        Firebase Console: Project settings -> Your apps -> Web app config. Firestore és Google sign-in legyen bekapcsolva.
+      </div>
+    </section>
+
+    <section id="authScreen" class="screen">
+      <div class="topbar">
+        <div>
+          <div class="brand">Spend CSV</div>
+          <div class="subtle">Cloud-first tracker</div>
+        </div>
+        <button id="editConfigBtn" class="icon-btn" title="Firebase config">⚙</button>
+      </div>
+      <div class="panel">
+        <div class="row-title">Belépés Google-lel</div>
+        <p class="row-meta">Az adatok Firestore-ban lesznek, telefonról is ugyanazt látod. A böngésző csak gyorsítótárat tart.</p>
+        <button id="loginBtn" class="btn primary block mt">Continue with Google</button>
+        <p id="authError" class="row-meta mt"></p>
+      </div>
+    </section>
+
+    <section id="appScreen" class="screen">
+      <div class="topbar">
+        <div>
+          <div class="brand">Spend CSV</div>
+          <div id="monthLabel" class="subtle">Current month</div>
+        </div>
+        <button id="userBtn" class="icon-btn" title="Account">☻</button>
+      </div>
+
+      <section id="homeView" class="view">
+        <div class="metric-grid">
+          <div class="metric">
+            <span class="subtle">This month</span>
+            <strong id="monthTotal">0 Ft</strong>
+          </div>
+          <div class="metric">
+            <span class="subtle">Needs review</span>
+            <strong id="reviewCountMetric">0</strong>
+          </div>
+          <div class="metric">
+            <span class="subtle">Rules</span>
+            <strong id="ruleCountMetric">0</strong>
+          </div>
+          <div class="metric">
+            <span class="subtle">Transactions</span>
+            <strong id="txCountMetric">0</strong>
+          </div>
+        </div>
+        <div class="topbar mb">
+          <span class="subtle">Recent</span>
+          <button id="quickImportBtn" class="btn primary">Import</button>
+        </div>
+        <div id="recentList" class="stack"></div>
+      </section>
+
+      <section id="importView" class="view hidden">
+        <div class="file-drop">
+          <input id="csvFileInput" type="file" accept=".csv,text/csv,.txt">
+          <div>
+            <div class="row-title">CSV import</div>
+            <p class="row-meta">Tap to choose a bank/Revolut CSV. The app will detect columns and apply merchant rules.</p>
+          </div>
+        </div>
+        <div id="importSummary" class="metric-grid hidden">
+          <div class="metric"><span class="subtle">Rows</span><strong id="importRows">0</strong></div>
+          <div class="metric"><span class="subtle">Ready</span><strong id="importReady">0</strong></div>
+          <div class="metric"><span class="subtle">Review</span><strong id="importReview">0</strong></div>
+          <div class="metric"><span class="subtle">Duplicate</span><strong id="importDuplicate">0</strong></div>
+        </div>
+        <div id="importActions" class="stack hidden">
+          <button id="saveReadyBtn" class="btn primary block">Import ready rows</button>
+          <button id="clearImportBtn" class="btn block">Clear preview</button>
+        </div>
+        <div class="topbar mt mb">
+          <span class="subtle">Preview</span>
+          <span id="importFileLabel" class="pill">No file</span>
+        </div>
+        <div id="previewList" class="stack"></div>
+      </section>
+
+      <section id="reviewView" class="view hidden">
+        <div class="notice mb">
+          Unknown merchants land here. Pick a category once, and the app can remember the merchant for future CSV imports.
+        </div>
+        <label class="chip-row mb">
+          <button id="autoRuleToggle" class="chip active" type="button">Remember merchants</button>
+        </label>
+        <div id="reviewList" class="stack"></div>
+      </section>
+
+      <section id="rulesView" class="view hidden">
+        <div class="topbar mb">
+          <span class="subtle">Merchant rules</span>
+          <button id="addCategoryBtn" class="btn">+ Category</button>
+        </div>
+        <div id="categoryList" class="chip-row mb"></div>
+        <div id="rulesList" class="stack"></div>
+      </section>
+
+      <section id="settingsView" class="view hidden">
+        <div class="stack">
+          <button id="exportCsvBtn" class="btn primary block">Export CSV</button>
+          <button id="exportJsonBtn" class="btn block">Export JSON backup</button>
+          <button id="manualTxBtn" class="btn block">Add transaction</button>
+          <button id="settingsConfigBtn" class="btn block">Firebase config</button>
+          <button id="logoutBtn" class="btn danger block">Sign out</button>
+        </div>
+        <div class="notice mt">
+          CSV is for Sheets/Excel. JSON backup contains transactions, categories and merchant rules.
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <nav id="tabs" class="tabs hidden" aria-label="Navigation">
+    <button class="tab active" data-view="homeView">Home</button>
+    <button class="tab" data-view="importView">Import</button>
+    <button class="tab" data-view="reviewView">Review</button>
+    <button class="tab" data-view="rulesView">Rules</button>
+    <button class="tab" data-view="settingsView">More</button>
+  </nav>
+
+  <div id="txModal" class="modal">
+    <div class="sheet">
+      <div class="topbar">
+        <div>
+          <div id="txModalTitle" class="row-title">Transaction</div>
+          <div class="row-meta">Manual edit</div>
+        </div>
+        <button class="icon-btn" data-close-modal>×</button>
+      </div>
+      <div class="stack">
+        <input id="txDateInput" class="field" type="date">
+        <input id="txAmountInput" class="field" type="number" inputmode="decimal" placeholder="Amount">
+        <input id="txMerchantInput" class="field" type="text" placeholder="Merchant">
+        <input id="txDescriptionInput" class="field" type="text" placeholder="Description">
+        <select id="txCategoryInput" class="field"></select>
+        <button id="saveTxBtn" class="btn primary block">Save</button>
+        <button id="deleteTxBtn" class="btn danger block hidden">Delete</button>
+      </div>
     </div>
+  </div>
 
-    <div id="appUI" class="app-container hidden">
-        <div class="flex justify-between items-center mb-8 px-2">
-            <button onclick="changeMonth(-1)" class="text-zinc-500 text-2xl font-black p-2"><<<</button>
-            <span id="currentMonthLabel" class="text-xs font-black uppercase tracking-[0.25em] text-white">JANUARY 2026</span>
-            <button onclick="changeMonth(1)" class="text-zinc-500 text-2xl font-black p-2">>>></button>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      browserLocalPersistence,
+      onAuthStateChanged,
+      setPersistence,
+      signInWithPopup,
+      signInWithRedirect,
+      getRedirectResult,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    import {
+      addDoc,
+      collection,
+      deleteDoc,
+      doc,
+      enableIndexedDbPersistence,
+      getDocs,
+      getFirestore,
+      onSnapshot,
+      orderBy,
+      query,
+      serverTimestamp,
+      setDoc,
+      updateDoc,
+      writeBatch
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+    const DEFAULT_CATEGORIES = [
+      ["Bevásárlás", "#ffd166"],
+      ["Kaja", "#ef476f"],
+      ["Közlekedés", "#06d6a0"],
+      ["Otthon", "#118ab2"],
+      ["Számlák", "#9b5de5"],
+      ["Szórakozás", "#f15bb5"],
+      ["Egészség", "#00bbf9"],
+      ["Egyéb", "#8d99ae"]
+    ];
+    const CONFIG_KEY = "spendCsvFirebaseConfig";
+    const tabButtons = [...document.querySelectorAll(".tab")];
+    const screens = ["setupScreen", "authScreen", "appScreen"];
+    const views = ["homeView", "importView", "reviewView", "rulesView", "settingsView"];
+
+    let firebaseApp = null;
+    let auth = null;
+    let db = null;
+    let currentUser = null;
+    let unsubscribers = [];
+    let transactions = [];
+    let categories = [];
+    let rules = [];
+    let importPreview = [];
+    let currentImportFile = "";
+    let autoCreateRules = true;
+    let editingTxId = null;
+
+    const $ = (id) => document.getElementById(id);
+    const money = (value, currency = "HUF") => {
+      const amount = Math.round(Number(value || 0));
+      if (currency === "HUF") return `${amount.toLocaleString("hu-HU")} Ft`;
+      return `${amount.toLocaleString("hu-HU")} ${currency}`;
+    };
+    const todayISO = () => new Date().toISOString().slice(0, 10);
+    const normalize = (value) => String(value || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\b(card|payment|purchase|pos|terminal|budapest|hu|huf|visa|mastercard)\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const makeId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+
+    function showScreen(screenId) {
+      screens.forEach((id) => $(id).classList.toggle("active", id === screenId));
+      $("tabs").classList.toggle("hidden", screenId !== "appScreen");
+    }
+
+    function showView(viewId) {
+      views.forEach((id) => $(id).classList.toggle("hidden", id !== viewId));
+      tabButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.view === viewId));
+      if (viewId === "reviewView") renderReview();
+    }
+
+    function getSavedConfig() {
+      const raw = localStorage.getItem(CONFIG_KEY);
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+
+    function parseConfig(raw) {
+      const cleaned = raw
+        .replace(/^const\s+firebaseConfig\s*=\s*/m, "")
+        .replace(/^var\s+firebaseConfig\s*=\s*/m, "")
+        .replace(/^let\s+firebaseConfig\s*=\s*/m, "")
+        .replace(/;\s*$/m, "");
+      try { return JSON.parse(cleaned); } catch {}
+      return Function(`"use strict"; return (${cleaned});`)();
+    }
+
+    async function bootFirebase(config) {
+      firebaseApp = initializeApp(config);
+      auth = getAuth(firebaseApp);
+      await setPersistence(auth, browserLocalPersistence).catch((error) => {
+        $("authError").textContent = `${error.code || "auth/persistence"}: ${error.message || "Could not keep sign-in state."}`;
+      });
+      db = getFirestore(firebaseApp);
+      enableIndexedDbPersistence(db).catch(() => {});
+      const redirectResult = await getRedirectResult(auth).catch((error) => {
+        $("authError").textContent = `${error.code || "auth/redirect"}: ${error.message || "Google redirect sign-in failed."}`;
+        return null;
+      });
+      if (redirectResult?.user) {
+        $("authError").textContent = "";
+      }
+      onAuthStateChanged(auth, async (user) => {
+        currentUser = user;
+        cleanupListeners();
+        if (!user) {
+          showScreen("authScreen");
+          return;
+        }
+        $("authError").textContent = "";
+        showScreen("appScreen");
+        await ensureDefaults();
+        subscribeData();
+      });
+    }
+
+    function cleanupListeners() {
+      unsubscribers.forEach((fn) => fn());
+      unsubscribers = [];
+    }
+
+    function userCollection(name) {
+      return collection(db, "users", currentUser.uid, name);
+    }
+
+    async function ensureDefaults() {
+      const snap = await getDocs(userCollection("categories"));
+      if (!snap.empty) return;
+      const batch = writeBatch(db);
+      DEFAULT_CATEGORIES.forEach(([name, color]) => {
+        const ref = doc(userCollection("categories"));
+        batch.set(ref, { name, color, createdAt: serverTimestamp() });
+      });
+      await batch.commit();
+    }
+
+    function subscribeData() {
+      unsubscribers.push(onSnapshot(query(userCollection("transactions"), orderBy("date", "desc")), (snap) => {
+        transactions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        renderAll();
+      }));
+      unsubscribers.push(onSnapshot(query(userCollection("categories"), orderBy("createdAt", "asc")), (snap) => {
+        categories = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        renderAll();
+      }));
+      unsubscribers.push(onSnapshot(query(userCollection("rules"), orderBy("createdAt", "desc")), (snap) => {
+        rules = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        renderAll();
+      }));
+    }
+
+    function renderAll() {
+      renderHome();
+      renderCategories();
+      renderRules();
+      renderImportPreview();
+      renderReview();
+      fillCategorySelect();
+    }
+
+    function currentMonthTransactions() {
+      const now = new Date();
+      return transactions.filter((tx) => {
+        const d = new Date(`${tx.date}T12:00:00`);
+        return tx.direction !== "income" && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      });
+    }
+
+    function categoryById(id) {
+      return categories.find((cat) => cat.id === id);
+    }
+
+    function categoryByName(name) {
+      const key = normalize(name);
+      return categories.find((cat) => normalize(cat.name) === key);
+    }
+
+    function renderHome() {
+      const now = new Date();
+      $("monthLabel").textContent = now.toLocaleDateString("hu-HU", { month: "long", year: "numeric" });
+      const monthTx = currentMonthTransactions();
+      const total = monthTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+      const reviewCount = importPreview.filter((row) => row.status === "review").length;
+      $("monthTotal").textContent = money(total);
+      $("reviewCountMetric").textContent = reviewCount;
+      $("ruleCountMetric").textContent = rules.length;
+      $("txCountMetric").textContent = transactions.length;
+      const recent = transactions.slice(0, 12);
+      $("recentList").innerHTML = recent.length ? recent.map(transactionRowHTML).join("") : `<div class="empty">No transactions yet. Import a CSV to start.</div>`;
+      [...$("recentList").querySelectorAll("[data-edit-tx]")].forEach((btn) => {
+        btn.addEventListener("click", () => openTxModal(transactions.find((tx) => tx.id === btn.dataset.editTx)));
+      });
+    }
+
+    function transactionRowHTML(tx) {
+      const cat = categoryById(tx.categoryId);
+      const color = cat?.color || "#555";
+      const label = cat?.name || "Uncategorized";
+      return `
+        <button class="row" data-edit-tx="${tx.id}">
+          <span>
+            <span class="row-title">${escapeHTML(tx.merchant || tx.description || "Transaction")}</span>
+            <span class="row-meta"><span class="category-dot" style="background:${color}"></span>${escapeHTML(label)} · ${escapeHTML(tx.date || "")}</span>
+          </span>
+          <span class="amount">${money(tx.amount, tx.currency)}</span>
+        </button>
+      `;
+    }
+
+    function renderCategories() {
+      $("categoryList").innerHTML = categories.length ? categories.map((cat) => `
+        <button class="chip" style="border-color:${cat.color};">
+          <span class="category-dot" style="background:${cat.color}"></span>${escapeHTML(cat.name)}
+        </button>
+      `).join("") : "";
+    }
+
+    function renderRules() {
+      $("rulesList").innerHTML = rules.length ? rules.map((rule) => {
+        const cat = categoryById(rule.categoryId);
+        return `
+          <div class="row">
+            <span>
+              <span class="row-title">${escapeHTML(rule.merchantName || rule.pattern)}</span>
+              <span class="row-meta">${escapeHTML(rule.pattern)} -> ${escapeHTML(cat?.name || "Missing category")}</span>
+            </span>
+            <button class="icon-btn" data-delete-rule="${rule.id}" title="Delete">×</button>
+          </div>
+        `;
+      }).join("") : `<div class="empty">Rules will appear when you teach the app a merchant.</div>`;
+      [...$("rulesList").querySelectorAll("[data-delete-rule]")].forEach((btn) => {
+        btn.addEventListener("click", () => deleteDoc(doc(userCollection("rules"), btn.dataset.deleteRule)));
+      });
+    }
+
+    function fillCategorySelect() {
+      const options = categories.map((cat) => `<option value="${cat.id}">${escapeHTML(cat.name)}</option>`).join("");
+      $("txCategoryInput").innerHTML = options;
+    }
+
+    function parseCSV(text) {
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let quote = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        const next = text[i + 1];
+        if (ch === '"' && quote && next === '"') {
+          cell += '"';
+          i++;
+        } else if (ch === '"') {
+          quote = !quote;
+        } else if ((ch === "," || ch === ";" || ch === "\t") && !quote) {
+          row.push(cell.trim());
+          cell = "";
+        } else if ((ch === "\n" || ch === "\r") && !quote) {
+          if (ch === "\r" && next === "\n") i++;
+          row.push(cell.trim());
+          if (row.some(Boolean)) rows.push(row);
+          row = [];
+          cell = "";
+        } else {
+          cell += ch;
+        }
+      }
+      row.push(cell.trim());
+      if (row.some(Boolean)) rows.push(row);
+      return rows;
+    }
+
+    function headerIndex(headers, aliases) {
+      const normalized = headers.map(normalize);
+      for (const alias of aliases) {
+        const key = normalize(alias);
+        const exact = normalized.indexOf(key);
+        if (exact >= 0) return exact;
+        const partial = normalized.findIndex((header) => header.includes(key) || key.includes(header));
+        if (partial >= 0) return partial;
+      }
+      return -1;
+    }
+
+    function parseAmount(value) {
+      const raw = String(value || "").replace(/\s/g, "").replace(/[^\d,.-]/g, "");
+      if (!raw) return 0;
+      const hasComma = raw.includes(",");
+      const hasDot = raw.includes(".");
+      let normalized = raw;
+      if (hasComma && hasDot) normalized = raw.replace(/\./g, "").replace(",", ".");
+      else if (hasComma) normalized = raw.replace(",", ".");
+      return Number(normalized) || 0;
+    }
+
+    function parseDate(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return todayISO();
+      const iso = raw.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+      if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+      const hu = raw.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+      if (hu) return `${hu[3]}-${hu[2].padStart(2, "0")}-${hu[1].padStart(2, "0")}`;
+      const d = new Date(raw);
+      return Number.isNaN(d.getTime()) ? todayISO() : d.toISOString().slice(0, 10);
+    }
+
+    function makeFingerprint(row) {
+      return normalize(`${row.date} ${row.amount} ${row.currency} ${row.merchant || row.description}`);
+    }
+
+    function matchRule(merchant, description) {
+      const target = normalize(`${merchant} ${description}`);
+      return rules.find((rule) => target.includes(normalize(rule.pattern)));
+    }
+
+    function guessMerchant(description) {
+      const normalized = String(description || "")
+        .replace(/\b\d{4,}\b/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const parts = normalized.split(/[-*|]/).map((part) => part.trim()).filter(Boolean);
+      return (parts[0] || normalized || "Unknown").slice(0, 56);
+    }
+
+    function buildPreviewFromCSV(text, fileName) {
+      const rows = parseCSV(text);
+      if (rows.length < 2) throw new Error("No CSV rows found.");
+      const headers = rows[0];
+      const idx = {
+        date: headerIndex(headers, ["date", "datum", "dátum", "booking date", "completed date", "transaction date", "könyvelés dátuma"]),
+        amount: headerIndex(headers, ["amount", "osszeg", "összeg", "value", "sum", "paid out", "debit", "terhelés", "terheles"]),
+        merchant: headerIndex(headers, ["merchant", "partner", "name", "counterparty", "kedvezményezett", "kereskedő"]),
+        description: headerIndex(headers, ["description", "details", "leiras", "leírás", "note", "message", "közlemény"]),
+        currency: headerIndex(headers, ["currency", "deviza", "ccy"])
+      };
+      if (idx.date < 0 || idx.amount < 0) throw new Error("Could not detect date and amount columns.");
+      const amountHeader = normalize(headers[idx.amount]);
+      const debitColumn = ["paid out", "debit", "terheles", "kifizetes", "kiadas"].some((token) => amountHeader.includes(normalize(token)));
+      const existing = new Set(transactions.map((tx) => tx.fingerprint).filter(Boolean));
+      currentImportFile = fileName;
+      importPreview = rows.slice(1).map((cells) => {
+        const signedAmount = parseAmount(cells[idx.amount]);
+        const direction = debitColumn || signedAmount < 0 ? "expense" : "income";
+        const description = cells[idx.description] || cells[idx.merchant] || "";
+        const merchant = cells[idx.merchant] || guessMerchant(description);
+        const parsed = {
+          id: makeId(),
+          date: parseDate(cells[idx.date]),
+          amount: Math.abs(signedAmount),
+          currency: idx.currency >= 0 ? (cells[idx.currency] || "HUF").toUpperCase() : "HUF",
+          merchant,
+          description,
+          direction,
+          source: "csv",
+          importFile: fileName
+        };
+        parsed.fingerprint = makeFingerprint(parsed);
+        const rule = matchRule(parsed.merchant, parsed.description);
+        parsed.categoryId = rule?.categoryId || null;
+        parsed.status = existing.has(parsed.fingerprint) ? "duplicate" : (parsed.categoryId ? "ready" : "review");
+        return parsed;
+      }).filter((row) => row.amount > 0);
+      renderImportPreview();
+      renderReview();
+      showView("importView");
+    }
+
+    function renderImportPreview() {
+      const rows = importPreview;
+      $("importSummary").classList.toggle("hidden", !rows.length);
+      $("importActions").classList.toggle("hidden", !rows.length);
+      $("importFileLabel").textContent = currentImportFile || "No file";
+      $("importRows").textContent = rows.length;
+      $("importReady").textContent = rows.filter((r) => r.status === "ready").length;
+      $("importReview").textContent = rows.filter((r) => r.status === "review").length;
+      $("importDuplicate").textContent = rows.filter((r) => r.status === "duplicate").length;
+      $("saveReadyBtn").disabled = !rows.some((r) => r.status === "ready");
+      $("previewList").innerHTML = rows.length ? rows.slice(0, 30).map(previewRowHTML).join("") : `<div class="empty">Choose a CSV file to preview imports.</div>`;
+    }
+
+    function previewRowHTML(row) {
+      const cat = categoryById(row.categoryId);
+      const statusClass = row.status === "ready" ? "good" : row.status === "duplicate" ? "bad" : "warn";
+      return `
+        <div class="row">
+          <span>
+            <span class="row-title">${escapeHTML(row.merchant)}</span>
+            <span class="row-meta">${escapeHTML(row.date)} · ${escapeHTML(cat?.name || "Needs review")}</span>
+          </span>
+          <span>
+            <span class="amount">${money(row.amount, row.currency)}</span><br>
+            <span class="pill ${statusClass}">${row.status}</span>
+          </span>
         </div>
+      `;
+    }
 
-        <div class="mb-8 px-2">
-            <h2 id="totalDisplay" class="text-5xl font-black tabular-nums tracking-tighter text-white leading-none">0 Ft</h2>
-            <div id="waterlineContainer" class="waterline-container"></div>
+    function renderReview() {
+      $("autoRuleToggle").classList.toggle("active", autoCreateRules);
+      const rows = importPreview.filter((row) => row.status === "review");
+      $("reviewList").innerHTML = rows.length ? rows.map((row) => `
+        <div class="panel">
+          <div class="row-title">${escapeHTML(row.merchant)}</div>
+          <div class="row-meta">${escapeHTML(row.date)} · ${money(row.amount, row.currency)} · ${escapeHTML(row.description || "")}</div>
+          <div class="chip-row mt">
+            ${categories.map((cat) => `<button class="chip" data-review-id="${row.id}" data-cat-id="${cat.id}"><span class="category-dot" style="background:${cat.color}"></span>${escapeHTML(cat.name)}</button>`).join("")}
+          </div>
         </div>
+      `).join("") : `<div class="empty">Nothing to review. Nice.</div>`;
+      [...$("reviewList").querySelectorAll("[data-review-id]")].forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const row = importPreview.find((item) => item.id === btn.dataset.reviewId);
+          if (!row) return;
+          row.categoryId = btn.dataset.catId;
+          row.status = "ready";
+          if (autoCreateRules) await createRuleFromRow(row);
+          renderAll();
+          showView(importPreview.some((item) => item.status === "review") ? "reviewView" : "importView");
+        });
+      });
+    }
 
-        <div id="controlGrid" class="control-grid">
-            <button onclick="openInputMode(true)" class="control-card btn-add"><span class="text-4xl font-black">+</span></button>
-            <div class="control-card">
-                <span class="text-[9px] font-black uppercase text-zinc-600 tracking-widest mb-2">VS PREV MONTH</span>
-                <div id="comparisonContainer"><span class="pill pill-neutral">--</span></div>
-            </div>
-            <button onclick="setBudget()" class="control-card">
-                <span class="text-[9px] font-black uppercase text-zinc-600 tracking-widest mb-1">REMAINING</span>
-                <span id="budgetLeftLabel" class="text-lg font-bold tabular-nums text-white">--</span>
-            </button>
-            <button onclick="toggleView()" class="control-card btn-sum"><span class="text-sm font-black uppercase tracking-widest">SUM</span></button>
-        </div>
+    async function createRuleFromRow(row) {
+      const pattern = normalize(row.merchant);
+      if (!pattern || rules.some((rule) => normalize(rule.pattern) === pattern)) return;
+      await addDoc(userCollection("rules"), {
+        pattern,
+        merchantName: row.merchant,
+        categoryId: row.categoryId,
+        createdAt: serverTimestamp()
+      });
+    }
 
-        <div class="flex-1">
-            <div id="activityView">
-                <div class="flex justify-between items-center mb-3 px-2">
-                    <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-700">History</h3>
-                    <div id="loadingIndicator" class="spinner hidden"></div>
-                </div>
-                <ul id="expenseList" class="stack-list"></ul>
-            </div>
+    async function savePreviewRows(statuses = ["ready"]) {
+      const rows = importPreview.filter((row) => statuses.includes(row.status));
+      if (!rows.length) return;
+      const batch = writeBatch(db);
+      rows.forEach((row) => {
+        const ref = doc(userCollection("transactions"));
+        batch.set(ref, {
+          date: row.date,
+          amount: row.amount,
+          currency: row.currency,
+          direction: row.direction,
+          merchant: row.merchant,
+          description: row.description,
+          categoryId: row.categoryId,
+          source: row.source,
+          importFile: row.importFile,
+          fingerprint: row.fingerprint,
+          createdAt: serverTimestamp()
+        });
+      });
+      await batch.commit();
+      importPreview = importPreview.filter((row) => !statuses.includes(row.status));
+      renderAll();
+    }
 
-            <div id="summaryView" class="hidden">
-                <div class="flex justify-between items-center mb-6 px-2">
-                    <h3 class="text-[10px] font-black uppercase tracking-widest text-zinc-500">Breakdown</h3>
-                    <button onclick="toggleView()" class="text-[10px] font-bold uppercase tracking-widest text-white bg-zinc-900 px-3 py-2 rounded-full">Back</button>
-                </div>
-                <ul id="summaryList" class="stack-list mb-0" style="padding-bottom: 0;"></ul>
-                
-                <div class="stat-grid px-2 mb-2 mt-3">
-                    <div class="stat-card"><span class="stat-label">Daily Avg</span><span id="summDaily" class="stat-value">--</span></div>
-                    <div class="stat-card"><span class="stat-label">Forecast</span><span id="summForecast" class="stat-value">--</span></div>
-                    <div class="stat-card"><span class="stat-label">Safe Until</span><span id="summRunway" class="stat-value">--</span></div>
-                </div>
+    async function openTxModal(tx = null) {
+      editingTxId = tx?.id || null;
+      $("txModalTitle").textContent = tx ? "Edit transaction" : "Add transaction";
+      $("txDateInput").value = tx?.date || todayISO();
+      $("txAmountInput").value = tx?.amount || "";
+      $("txMerchantInput").value = tx?.merchant || "";
+      $("txDescriptionInput").value = tx?.description || "";
+      $("txCategoryInput").value = tx?.categoryId || categories[0]?.id || "";
+      $("deleteTxBtn").classList.toggle("hidden", !tx);
+      $("txModal").classList.add("active");
+    }
 
-                <div class="p-4 bg-[#1c1c1e] rounded-3xl border border-zinc-800 mb-8 mt-4">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Trend (Daily Spikes)</h3>
-                    </div>
-                    <div class="h-32 w-full flex items-end">
-                        <svg id="spendingChart" class="w-full h-full overflow-visible" preserveAspectRatio="none"></svg>
-                    </div>
-                </div>
+    async function saveManualTx() {
+      const payload = {
+        date: $("txDateInput").value || todayISO(),
+        amount: Math.abs(Number($("txAmountInput").value || 0)),
+        currency: "HUF",
+        direction: "expense",
+        merchant: $("txMerchantInput").value.trim() || "Manual",
+        description: $("txDescriptionInput").value.trim(),
+        categoryId: $("txCategoryInput").value,
+        source: "manual",
+        updatedAt: serverTimestamp()
+      };
+      payload.fingerprint = makeFingerprint(payload);
+      if (!payload.amount || !payload.categoryId) return;
+      if (editingTxId) await updateDoc(doc(userCollection("transactions"), editingTxId), payload);
+      else await addDoc(userCollection("transactions"), { ...payload, createdAt: serverTimestamp() });
+      closeModal();
+    }
 
-                <div class="px-2 mb-8">
-                    <div class="flex justify-between items-center mb-2">
-                        <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500">Zero Spend Days</h3>
-                        <span id="zeroSpendCount" class="text-[9px] font-bold text-white">0</span>
-                    </div>
-                    <div id="integrityGrid" class="flex gap-[2px] h-6 items-end w-full"></div>
-                </div>
+    function closeModal() {
+      $("txModal").classList.remove("active");
+      editingTxId = null;
+    }
 
-                <div class="px-2 mb-8 flex justify-center flex-col items-center">
-                    <h3 class="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-4 w-full text-left">Distribution</h3>
-                    <div class="w-48 h-48 relative">
-                        <svg id="categoryPieChart" viewBox="0 0 100 100" class="w-full h-full"></svg>
-                    </div>
-                </div>
-            </div>
+    function exportCSV() {
+      const headers = ["date", "amount", "currency", "merchant", "description", "category", "source"];
+      const rows = transactions.map((tx) => [
+        tx.date,
+        tx.amount,
+        tx.currency || "HUF",
+        tx.merchant || "",
+        tx.description || "",
+        categoryById(tx.categoryId)?.name || "",
+        tx.source || ""
+      ]);
+      const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+      download(`spend-export-${todayISO()}.csv`, csv, "text/csv;charset=utf-8");
+    }
 
-            <div id="focusView" class="hidden">
-                <div class="flex justify-between items-center mb-6 px-2">
-                    <h3 id="focusHeaderLabel" class="text-[10px] font-black uppercase tracking-widest text-zinc-500">CATEGORY</h3>
-                    <button onclick="closeFocusView()" class="text-[10px] font-bold uppercase tracking-widest text-white bg-zinc-900 px-3 py-2 rounded-full">Back</button>
-                </div>
-                <div class="mb-4 px-2 flex justify-between items-end">
-                    <h2 id="focusTotalDisplay" class="text-3xl font-black text-white">0 Ft</h2>
-                </div>
-                
-                <div id="focusStats" class="stat-grid px-2">
-                    <div class="stat-card"><span class="stat-label">Avg</span><span id="statTicket" class="stat-value">--</span></div>
-                    <div class="stat-card"><span class="stat-label">Freq</span><span id="statPulse" class="stat-value">--</span></div>
-                    <div class="stat-card"><span class="stat-label">Peak</span><span id="statDoom" class="stat-value">--</span></div>
-                </div>
+    function exportJSON() {
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        transactions,
+        categories,
+        rules
+      };
+      download(`spend-backup-${todayISO()}.json`, JSON.stringify(payload, null, 2), "application/json");
+    }
 
-                <ul id="focusList" class="stack-list"></ul>
-            </div>
-        </div>
-        
-        <div class="text-center py-4 flex flex-col items-center gap-2">
-            <span class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">v2.14.0</span>
-            <button onclick="handleLogout()" class="text-[9px] font-bold text-zinc-800 uppercase tracking-widest hover:text-red-500">Log Out</button>
-        </div>
-    </div>
+    function csvCell(value) {
+      const text = String(value ?? "");
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }
 
-    <div id="inputOverlay" class="input-overlay hidden">
-        <div class="flex justify-between items-center mb-6">
-            <button onclick="closeInputMode()" class="text-zinc-500 font-bold text-xs uppercase tracking-widest">Cancel</button>
-            <span id="inputHeaderLabel" class="text-zinc-700 font-black text-xs uppercase tracking-widest">Add New</span>
-            <button onclick="addNewCategory()" class="text-white font-bold text-xs uppercase tracking-widest">+ Cat</button>
-        </div>
-        <input id="amountInput" type="text" inputmode="decimal" placeholder="0" class="w-full bg-transparent border-b-2 border-zinc-800 py-4 text-6xl font-black text-center outline-none focus:border-white transition-colors mb-4 text-white">
-        <div id="dateLocationTop" class="mb-4"></div>
-        <div id="categoryGrid" class="category-grid mb-6"></div>
-        <input id="noteInput" type="text" placeholder="Add a note..." class="w-full bg-[#1c1c1e] text-white p-4 rounded-xl mb-6 outline-none text-center text-sm font-bold placeholder-zinc-700 border border-zinc-800 focus:border-zinc-600">
-        <div id="dateLocationBottom" class="mt-auto"></div>
-        <div id="dateScrollerWrapper" class="hidden">
-            <span class="text-[9px] font-bold text-zinc-600 uppercase tracking-widest block mb-3 text-center">Select Date</span>
-            <div id="dateScroller" class="date-scroller"></div>
-        </div>
-    </div>
+    function download(fileName, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+    }
 
-    <div id="catModal" class="modal-overlay hidden">
-        <div class="bg-[#1c1c1e] w-64 p-6 rounded-2xl border border-zinc-800 text-center">
-            <h3 id="catModalTitle" class="text-white font-black uppercase tracking-widest mb-6 text-sm">Options</h3>
-            <button onclick="handleRename()" class="w-full bg-white text-black font-bold py-3 rounded-xl mb-3 text-xs uppercase" style="-webkit-user-select:none;">Rename</button>
-            <button onclick="handleDeleteCat()" class="w-full bg-red-900/20 text-red-500 font-bold py-3 rounded-xl mb-3 text-xs uppercase" style="-webkit-user-select:none;">Delete</button>
-            <button onclick="closeCatModal()" class="w-full text-zinc-500 font-bold py-3 text-xs uppercase" style="-webkit-user-select:none;">Cancel</button>
-        </div>
-    </div>
+    function escapeHTML(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[ch]));
+    }
 
-    <script>
-        const SUPABASE_URL = 'https://tqddyuhcddqddviyessk.supabase.co'; 
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxZGR5dWhjZGRxZGR2aXllc3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk5NzkxMTYsImV4cCI6MjA4NTU1NTExNn0.nYWIsAnfDFvR4JtujfstvFXyaEtAWgFExRFI38iEDv0';
-        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        const BASE_PALETTE = ['#FF9F1C', '#795548', '#FFD700', '#D32F2F', '#1976D2', '#673AB7', '#F8BBD0', '#FFF9C4', '#00796B', '#9E9E9E'];
-        
-        let expenses = []; let categories = []; let categoryUsage = {}; 
-        let budgetLimit = parseFloat(localStorage.getItem('budgetLimit')) || 0;
-        let viewDate = new Date(); let selectedTimestamp = new Date().setHours(12,0,0,0);
-        let currentEditItem = null; let isSummaryMode = false; let longPressTimer; let selectedCatForMenu = null;
-        let currentUser = null;
-        let previousTotalValue = null; 
-        let isFirstLoad = true;
-        let loginStep = 'email'; // email or code
+    $("saveConfigBtn").addEventListener("click", async () => {
+      try {
+        const config = parseConfig($("firebaseConfigInput").value);
+        if (!config.apiKey || !config.projectId) throw new Error("Missing apiKey or projectId.");
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+        await bootFirebase(config);
+      } catch (error) {
+        alert(`Firebase config error: ${error.message}`);
+      }
+    });
+    $("clearConfigBtn").addEventListener("click", () => {
+      localStorage.removeItem(CONFIG_KEY);
+      $("firebaseConfigInput").value = "";
+      showScreen("setupScreen");
+    });
 
-        async function init() {
-            const { data: { session } } = await sb.auth.getSession();
-            if (session) {
-                currentUser = session.user;
-                document.getElementById('authScreen').classList.add('hidden');
-                document.getElementById('appUI').classList.remove('hidden');
-                await fetchCategories(); await fetchExpenses();
-            } else {
-                document.getElementById('authScreen').classList.remove('hidden');
-                document.getElementById('appUI').classList.add('hidden');
-            }
-            sb.auth.onAuthStateChange((_event, session) => {
-                if (session) {
-                    currentUser = session.user;
-                    document.getElementById('authScreen').classList.add('hidden');
-                    document.getElementById('appUI').classList.remove('hidden');
-                    fetchCategories(); fetchExpenses();
-                }
-            });
-        }
+    $("editConfigBtn").addEventListener("click", () => {
+      $("firebaseConfigInput").value = JSON.stringify(getSavedConfig() || {}, null, 2);
+      showScreen("setupScreen");
+    });
+    $("settingsConfigBtn").addEventListener("click", () => {
+      $("firebaseConfigInput").value = JSON.stringify(getSavedConfig() || {}, null, 2);
+      showScreen("setupScreen");
+    });
 
-        async function handleLogin() {
-            const emailInput = document.getElementById('emailInput');
-            const codeInput = document.getElementById('codeInput');
-            const btn = document.getElementById('loginBtn');
-            const msg = document.getElementById('authMessage');
+    $("loginBtn").addEventListener("click", async () => {
+      const provider = new GoogleAuthProvider();
+      $("authError").textContent = "Opening Google sign-in...";
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (error) {
+        $("authError").textContent = `${error.code || "auth/error"}: ${error.message || "Google sign-in failed."}`;
+      }
+    });
 
-            if (loginStep === 'email') {
-                const email = emailInput.value.trim();
-                if (!email) return alert("Please enter an email");
-                
-                msg.innerText = "Sending code...";
-                // Request OTP
-                const { error } = await sb.auth.signInWithOtp({ 
-                    email,
-                    options: { emailRedirectTo: 'https://mmldb.github.io/Spending-tracker' }
-                });
-                
-                if (error) {
-                    msg.innerText = "Error: " + error.message;
-                } else {
-                    msg.innerText = "Code sent! Check your email.";
-                    loginStep = 'code';
-                    emailInput.classList.add('hidden');
-                    codeInput.classList.remove('hidden');
-                    btn.innerText = "VERIFY CODE";
-                    codeInput.focus();
-                }
-            } else {
-                // Verify Code Step
-                const email = emailInput.value.trim();
-                const token = codeInput.value.trim();
-                if (!token) return alert("Enter the code");
-                
-                msg.innerText = "Verifying...";
-                const { data, error } = await sb.auth.verifyOtp({
-                    email,
-                    token,
-                    type: 'email'
-                });
+    $("logoutBtn").addEventListener("click", () => signOut(auth));
+    $("userBtn").addEventListener("click", () => showView("settingsView"));
+    $("quickImportBtn").addEventListener("click", () => showView("importView"));
+    $("autoRuleToggle").addEventListener("click", () => {
+      autoCreateRules = !autoCreateRules;
+      renderReview();
+    });
+    $("clearImportBtn").addEventListener("click", () => {
+      importPreview = [];
+      currentImportFile = "";
+      renderAll();
+    });
+    $("saveReadyBtn").addEventListener("click", () => savePreviewRows(["ready"]));
+    $("exportCsvBtn").addEventListener("click", exportCSV);
+    $("exportJsonBtn").addEventListener("click", exportJSON);
+    $("manualTxBtn").addEventListener("click", () => openTxModal());
+    $("saveTxBtn").addEventListener("click", saveManualTx);
+    $("deleteTxBtn").addEventListener("click", async () => {
+      if (!editingTxId || !confirm("Delete transaction?")) return;
+      await deleteDoc(doc(userCollection("transactions"), editingTxId));
+      closeModal();
+    });
+    $("addCategoryBtn").addEventListener("click", async () => {
+      const name = prompt("Category name");
+      if (!name) return;
+      const color = prompt("Color hex", "#ffffff") || "#ffffff";
+      await addDoc(userCollection("categories"), { name, color, createdAt: serverTimestamp() });
+    });
+    $("csvFileInput").addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      try {
+        buildPreviewFromCSV(await file.text(), file.name);
+      } catch (error) {
+        alert(`CSV import error: ${error.message}`);
+      } finally {
+        event.target.value = "";
+      }
+    });
+    tabButtons.forEach((btn) => btn.addEventListener("click", () => showView(btn.dataset.view)));
+    document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", closeModal));
 
-                if (error) {
-                    msg.innerText = "Invalid code. Try again.";
-                } else {
-                    // Success is handled by onAuthStateChange
-                    msg.innerText = "Success!";
-                }
-            }
-        }
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
+    }
 
-        async function handleLogout() { await sb.auth.signOut(); location.reload(); }
-
-        function triggerHaptic() { if (navigator.vibrate) navigator.vibrate(50); }
-        function generateSmartColor(index) {
-            const baseColor = BASE_PALETTE[index % BASE_PALETTE.length]; const cycle = Math.floor(index / BASE_PALETTE.length);
-            if (cycle === 0) return baseColor; const brightness = (cycle % 2 === 1) ? 0.75 : 1.25; return adjustBrightness(baseColor, brightness);
-        }
-        function adjustBrightness(hex, percent) {
-            hex = hex.replace(/^\s*#|\s*$/g, ''); if(hex.length === 3) hex = hex.replace(/(.)/g, '$1$1');
-            let r = parseInt(hex.substr(0, 2), 16), g = parseInt(hex.substr(2, 2), 16), b = parseInt(hex.substr(4, 2), 16);
-            return `#${((1 << 24) + (Math.min(255, Math.floor(r * percent)) << 16) + (Math.min(255, Math.floor(g * percent)) << 8) + Math.min(255, Math.floor(b * percent))).toString(16).slice(1)}`;
-        }
-        function getContrastColor(hex) {
-            if(!hex) return '#FFFFFF'; hex = hex.replace(/^\s*#|\s*$/g, '');
-            let r = parseInt(hex.substr(0, 2), 16), g = parseInt(hex.substr(2, 2), 16), b = parseInt(hex.substr(4, 2), 16);
-            return (((r * 299) + (g * 587) + (b * 114)) / 1000) >= 128 ? '#000000' : '#FFFFFF';
-        }
-        function getCatColor(catName) { const c = categories.find(x => x.name === catName); return c ? c.color : '#333'; }
-
-        // --- SLOT MACHINE ANIMATION ---
-        function animateValue(obj, start, end, duration) {
-            let startTimestamp = null;
-            const step = (timestamp) => {
-                if (!startTimestamp) startTimestamp = timestamp;
-                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-                const easeOut = 1 - Math.pow(1 - progress, 3);
-                const current = Math.floor(easeOut * (end - start) + start);
-                obj.innerText = current.toLocaleString('hu-HU').replace(/,/g, ' ') + ' Ft';
-                if (progress < 1) {
-                    window.requestAnimationFrame(step);
-                } else {
-                    obj.innerText = end.toLocaleString('hu-HU').replace(/,/g, ' ') + ' Ft';
-                }
-            };
-            window.requestAnimationFrame(step);
-        }
-
-        async function fetchCategories() {
-            const { data, error } = await sb.from('categories').select('*').order('created_at', { ascending: true });
-            if(!error) {
-                categories = data || [];
-                let needsUpdate = false;
-                for (let i = 0; i < categories.length; i++) {
-                    if (!categories[i].color) {
-                        const newColor = generateSmartColor(i); await sb.from('categories').update({ color: newColor }).eq('id', categories[i].id);
-                        categories[i].color = newColor; needsUpdate = true;
-                    }
-                }
-                renderCategories();
-            }
-        }
-        async function addCategoryToDb(name) {
-            const newIndex = categories.length; const newColor = generateSmartColor(newIndex);
-            const { error } = await sb.from('categories').insert([{ name, color: newColor, user_id: currentUser.id }]);
-            if (!error) await fetchCategories();
-        }
-        async function renameCategoryDb(oldName, newName) {
-            document.getElementById('loadingIndicator').classList.remove('hidden');
-            await sb.from('categories').update({ name: newName }).eq('name', oldName);
-            await sb.from('expenses').update({ category: newName }).eq('category', oldName);
-            await fetchCategories(); await fetchExpenses(); triggerHaptic();
-        }
-        async function deleteCategoryFromDb(name) {
-            const { error } = await sb.from('categories').delete().eq('name', name);
-            if (!error) { triggerHaptic(); await fetchCategories(); } else alert("Check connection");
-        }
-        async function fetchExpenses() {
-            document.getElementById('loadingIndicator').classList.remove('hidden');
-            const { data, error } = await sb.from('expenses').select('*').order('date', { ascending: false }).order('id', { ascending: false });
-            if(!error) { expenses = data || []; categoryUsage = {}; expenses.forEach(e => categoryUsage[e.category] = (categoryUsage[e.category] || 0) + 1); renderAll(); }
-            document.getElementById('loadingIndicator').classList.add('hidden');
-        }
-        async function saveToDb(cat, amt, date, note, id = null) {
-            document.getElementById('loadingIndicator').classList.remove('hidden');
-            const payload = { category: cat, amount: amt, date: date, note: note || null, user_id: currentUser.id };
-            const { error } = id ? await sb.from('expenses').update(payload).eq('id', id) : await sb.from('expenses').insert([payload]);
-            if (error) alert("Save failed"); else { triggerHaptic(); await fetchExpenses(); }
-        }
-        async function deleteFromDb(id) {
-            if(!confirm("Delete?")) return;
-            document.getElementById('loadingIndicator').classList.remove('hidden');
-            const { error } = await sb.from('expenses').delete().eq('id', id);
-            if(!error) { triggerHaptic(); await fetchExpenses(); }
-        }
-
-        function renderCategories() {
-            const sorted = [...categories].sort((a,b) => (categoryUsage[b.name]||0) - (categoryUsage[a.name]||0));
-            let activeCat = currentEditItem ? currentEditItem.category : null;
-            document.getElementById('categoryGrid').innerHTML = sorted.map(c => {
-                const activeClass = (c.name === activeCat) ? 'active-edit' : '';
-                return `<button style="background-color: ${c.color}; color: ${getContrastColor(c.color)}; border-color: ${c.color}" onmousedown="startLongPress('${c.name}')" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress('${c.name}')" onmouseup="cancelLongPress()" ontouchend="cancelLongPress()" ontouchmove="cancelLongPress()" onclick="saveTransaction('${c.name}')" oncontextmenu="return false;" class="category-btn ${activeClass}">${c.name}</button>`;
-            }).join('');
-        }
-
-        function renderAll() {
-            document.getElementById('currentMonthLabel').innerText = viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            const currentMonthData = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear(); }); 
-            const total = currentMonthData.reduce((sum, e) => sum + e.amount, 0);
-            
-            // LOGIC: Disable roll on first load
-            const displayEl = document.getElementById('totalDisplay');
-            if (isFirstLoad) {
-                displayEl.innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
-                previousTotalValue = total;
-                isFirstLoad = false;
-            } else if (previousTotalValue !== null && previousTotalValue !== total) {
-                animateValue(displayEl, previousTotalValue, total, 1000);
-                previousTotalValue = total;
-            } else {
-                displayEl.innerText = `${total.toLocaleString('hu-HU').replace(/,/g, ' ')} Ft`;
-            }
-
-            document.getElementById('expenseList').innerHTML = currentMonthData.map((e) => {
-                const col = getCatColor(e.category); const textColor = getContrastColor(col);
-                const noteHtml = e.note ? `<span class="block text-[8px] italic font-medium opacity-80" style="color:${textColor}">${e.note}</span>` : '';
-                return `<li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}"><div class="flex flex-col leading-tight"><span class="text-xs font-black uppercase tracking-tight">${e.category}</span>${noteHtml}<span class="text-[8px] font-bold uppercase opacity-70">${new Date(e.date).toLocaleDateString('hu-HU')}</span></div><div class="flex items-center gap-2"><span class="font-black text-sm tabular-nums">${Math.round(e.amount).toLocaleString('hu-HU')}</span><button onclick="event.stopPropagation(); deleteFromDb(${e.id})" class="text-lg px-2 opacity-40 hover:opacity-100">×</button></div></li>`;
-            }).join('');
-
-            updateControlGrid(total, currentMonthData);
-            if(isSummaryMode) renderSummaryList(currentMonthData, total);
-        }
-
-        function renderSummaryList(data, grandTotal) {
-            const totals = {}; const counts = {}; 
-            data.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; counts[e.category] = (counts[e.category] || 0) + 1; });
-            const sorted = Object.entries(totals).sort((a,b) => b[1] - a[1]);
-            const { prevExpenses } = getComparisonData();
-            const prevTotals = {}; prevExpenses.forEach(e => prevTotals[e.category] = (prevTotals[e.category] || 0) + e.amount);
-
-            document.getElementById('summaryList').innerHTML = sorted.map(([cat, amt]) => {
-                const col = getCatColor(cat); const pct = grandTotal > 0 ? (amt / grandTotal * 100).toFixed(0) : 0;
-                const prevAmt = prevTotals[cat] || 0; let pillHTML = "";
-                if (prevAmt > 0) {
-                    const diff = amt - prevAmt; const p = ((diff / prevAmt) * 100).toFixed(0);
-                    if (diff < 0) pillHTML = `<span class="pill pill-good ml-2">↓ ${Math.abs(p)}%</span>`;
-                    else if (diff > 0) pillHTML = `<span class="pill pill-bad ml-2">↑ ${Math.abs(p)}%</span>`;
-                    else pillHTML = `<span class="pill pill-neutral ml-2">=</span>`;
-                } else if (amt > 0) { pillHTML = `<span class="pill pill-neutral ml-2">NEW</span>`; }
-                const count = counts[cat] || 0; const share = grandTotal > 0 ? Math.round((amt / grandTotal) * 100) : 0;
-                return `<li onclick="openFocusView('${cat}')" class="stack-item" style="background: #000; border-color: #333;"><div class="summary-fill" style="width: 0%; background-color: ${col};" data-width="${pct}%"></div><div class="item-content"><div class="flex items-center"><span class="text-sm font-black uppercase tracking-tight" style="color:${col}">${cat}</span><span class="ml-2 text-[10px] font-bold text-zinc-500">(${count}) <span class="text-white opacity-60">· ${share}%</span></span>${pillHTML}</div><span class="text-md font-black tabular-nums">${Math.round(amt).toLocaleString('hu-HU')} Ft</span></div></li>`;
-            }).join('');
-            setTimeout(() => { document.querySelectorAll('.summary-fill').forEach(el => el.style.width = el.getAttribute('data-width')); }, 50);
-            renderGraph(data);
-            renderIntegrity(data); 
-            renderPieChart(data); 
-        }
-
-        // --- DONUT CHART RENDERER ---
-        function renderPieChart(data) {
-            const totals = {};
-            let grandTotal = 0;
-            data.forEach(e => {
-                totals[e.category] = (totals[e.category] || 0) + e.amount;
-                grandTotal += e.amount;
-            });
-
-            const sortedCats = Object.entries(totals).sort((a,b) => b[1] - a[1]);
-            const svg = document.getElementById('categoryPieChart');
-            
-            if (grandTotal === 0) {
-                svg.innerHTML = `
-                    <circle cx="50" cy="50" r="40" fill="none" stroke="#27272a" stroke-width="8" />
-                    <text x="50" y="52" text-anchor="middle" dominant-baseline="middle" fill="#52525b" font-size="10" font-weight="800">NO DATA</text>
-                `;
-                return;
-            }
-
-            let cumulativePercent = 0;
-            let pathsHtml = '';
-
-            sortedCats.forEach(([cat, amount]) => {
-                const percent = amount / grandTotal;
-                const [startX, startY] = getCoordinatesForPercent(cumulativePercent);
-                cumulativePercent += percent;
-                const [endX, endY] = getCoordinatesForPercent(cumulativePercent);
-                const largeArcFlag = percent > 0.5 ? 1 : 0;
-                const color = getCatColor(cat);
-
-                if (percent > 0.999) {
-                    pathsHtml += `<circle cx="50" cy="50" r="40" fill="${color}" />`;
-                } else {
-                    const pathData = [
-                        `M 50 50`,
-                        `L ${startX} ${startY}`,
-                        `A 40 40 0 ${largeArcFlag} 1 ${endX} ${endY}`,
-                        `Z`
-                    ].join(' ');
-                    pathsHtml += `<path d="${pathData}" fill="${color}" />`;
-                }
-            });
-
-            const holeHtml = `<circle cx="50" cy="50" r="32" fill="#000000" />`;
-            const labelHtml = `
-                <text x="50" y="48" text-anchor="middle" dominant-baseline="central" fill="#FFFFFF" font-size="12" font-weight="900" style="text-shadow: 0 2px 4px rgba(0,0,0,0.5);">${grandTotal.toLocaleString('hu-HU').replace(/,/g, ' ')}</text>
-                <text x="50" y="60" text-anchor="middle" dominant-baseline="central" fill="#71717a" font-size="6" font-weight="800" letter-spacing="0.5px">TOTAL</text>
-            `;
-
-            svg.innerHTML = `
-                <g transform="rotate(-90 50 50)">${pathsHtml}</g>
-                ${holeHtml}
-                ${labelHtml}
-            `;
-        }
-
-        function getCoordinatesForPercent(percent) {
-            const x = Math.cos(2 * Math.PI * percent) * 40 + 50; 
-            const y = Math.sin(2 * Math.PI * percent) * 40 + 50; 
-            return [x, y];
-        }
-
-        function renderIntegrity(data) {
-            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate();
-            const dailySpent = new Array(daysInMonth).fill(0);
-            data.forEach(e => dailySpent[new Date(e.date).getDate()-1] += e.amount);
-            
-            const now = new Date();
-            const isCurrentMonth = (now.getMonth() === viewDate.getMonth() && now.getFullYear() === viewDate.getFullYear());
-            const currentDay = now.getDate();
-            let zeroSpendCount = 0;
-
-            let html = '';
-            for(let i=0; i<daysInMonth; i++) {
-                const spent = dailySpent[i] > 0;
-                let bgClass = "bg-[#27272a]"; 
-                
-                if (isCurrentMonth) {
-                    if (i < currentDay) {
-                         if (!spent) zeroSpendCount++;
-                         bgClass = spent ? "bg-zinc-800" : "bg-white";
-                    }
-                } else if (viewDate < now) {
-                    if (!spent) zeroSpendCount++;
-                    bgClass = spent ? "bg-zinc-800" : "bg-white";
-                }
-
-                html += `<div class="flex-1 rounded-sm ${bgClass}" style="height: 100%; opacity: ${spent ? 0.4 : 1}"></div>`;
-            }
-            document.getElementById('integrityGrid').innerHTML = html;
-            document.getElementById('zeroSpendCount').innerText = zeroSpendCount;
-        }
-
-        function renderGraph(data) {
-            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
-            const daily = new Array(daysInMonth).fill(0);
-            let total = 0;
-            data.forEach(e => { daily[new Date(e.date).getDate() - 1] += e.amount; total += e.amount; });
-
-            const { prevExpenses } = getComparisonData();
-            const ghostDaily = new Array(daysInMonth).fill(0);
-            let ghostTotal = 0;
-            prevExpenses.forEach(e => {
-                const day = new Date(e.date).getDate() - 1;
-                if (day < daysInMonth) { ghostDaily[day] += e.amount; ghostTotal += e.amount; }
-            });
-
-            const now = new Date();
-            let daysPassed = daysInMonth;
-            if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) { daysPassed = now.getDate(); }
-            if (viewDate > now) daysPassed = 0;
-            
-            const avg = daysPassed > 0 ? total / daysPassed : 0;
-            const daysRemaining = daysInMonth - daysPassed;
-            const projected = total + (avg * daysRemaining);
-
-            document.getElementById('summDaily').innerText = `${Math.round(avg).toLocaleString('hu-HU')} Ft`;
-            document.getElementById('summForecast').innerText = `${Math.round(projected).toLocaleString('hu-HU')} Ft`;
-
-            let runwayText = "--";
-            if (budgetLimit > 0 && avg > 0) {
-                const remaining = budgetLimit - total;
-                if (remaining > 0) {
-                    const daysLeft = remaining / avg;
-                    const crashDate = new Date(); crashDate.setDate(now.getDate() + daysLeft);
-                    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                    runwayText = `${monthNames[crashDate.getMonth()]} ${crashDate.getDate()}`;
-                } else { runwayText = "0 Days"; }
-            }
-            document.getElementById('summRunway').innerText = runwayText;
-
-            const maxVal = Math.max(...daily, ...ghostDaily, avg * 1.5, 10);
-            
-            const svg = document.getElementById('spendingChart'); const w = svg.clientWidth || 300; const h = 128; const step = w / (daysInMonth - 1);
-            let pts = ""; let area = `0,${h} `;
-            let ghostPts = "";
-
-            daily.forEach((val, i) => { 
-                const x = i * step; const y = h - ((val / maxVal) * (h * 0.9)); 
-                pts += `${x},${y} `; 
-            });
-
-            ghostDaily.forEach((val, i) => {
-                const x = i * step; const y = h - ((val / maxVal) * (h * 0.9));
-                ghostPts += `${x},${y} `;
-            });
-
-            let verticalLines = ""; 
-            daily.forEach((_, i) => { 
-                const x = i * step; 
-                const currentDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), i + 1);
-                if (currentDate.getDay() === 1) { 
-                    verticalLines += `<line x1="${x}" y1="0" x2="${x}" y2="${h}" stroke="#333" stroke-width="1" stroke-dasharray="2,2" />`;
-                }
-            });
-            
-            const avgY = h - ((avg / maxVal) * (h * 0.9));
-
-            svg.innerHTML = `
-                <defs><linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="white" stop-opacity="0.2"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient></defs>
-                ${verticalLines} 
-                <polyline points="${ghostPts}" class="chart-line-ghost" />
-                <polyline points="${pts}" class="chart-line" />
-                ${avg > 0 ? `<line x1="0" y1="${avgY}" x2="${w}" y2="${avgY}" stroke="#71717a" stroke-width="1" stroke-dasharray="4,4" />` : ''}
-            `;
-        }
-
-        function updateControlGrid(currentTotal, currentMonthData) {
-            const budgetLabel = document.getElementById('budgetLeftLabel');
-            const waterlineContainer = document.getElementById('waterlineContainer');
-            if (budgetLimit > 0) {
-                const left = budgetLimit - currentTotal;
-                budgetLabel.innerText = `${left.toLocaleString('hu-HU')} Ft`;
-                budgetLabel.style.color = left < 0 ? '#f87171' : '#FFFFFF';
-            } else { budgetLabel.innerText = "TAP TO SET"; }
-            waterlineContainer.innerHTML = ''; 
-            if (budgetLimit > 0 && currentTotal > 0) {
-                const sortedByTime = [...currentMonthData].sort((a, b) => new Date(a.date) - new Date(b.date) || a.id - b.id);
-                sortedByTime.forEach(e => {
-                    const widthPct = (e.amount / budgetLimit) * 100;
-                    const segment = document.createElement('div');
-                    segment.style.width = `${widthPct}%`; segment.style.backgroundColor = getCatColor(e.category); segment.style.height = '100%';
-                    waterlineContainer.appendChild(segment);
-                });
-            } else {
-                const emptyBar = document.createElement('div'); emptyBar.style.width = '0%'; emptyBar.style.backgroundColor = '#333'; waterlineContainer.appendChild(emptyBar);
-            }
-            const { prevTotal } = getComparisonData();
-            const compContainer = document.getElementById('comparisonContainer');
-            if (prevTotal > 0) {
-                const diff = currentTotal - prevTotal; const pct = ((diff / prevTotal) * 100).toFixed(0);
-                if (diff < 0) compContainer.innerHTML = `<span class="pill pill-good">↓ ${Math.abs(pct)}%</span>`;
-                else if (diff > 0) compContainer.innerHTML = `<span class="pill pill-bad">↑ ${Math.abs(pct)}%</span>`;
-                else compContainer.innerHTML = `<span class="pill pill-neutral">=</span>`;
-            } else { 
-                if (currentTotal > 0) compContainer.innerHTML = `<span class="pill pill-neutral">NEW</span>`; else compContainer.innerHTML = `<span class="pill pill-neutral">--</span>`;
-            }
-        }
-        function openFocusView(cat) {
-            document.getElementById('summaryView').classList.add('hidden'); document.getElementById('focusView').classList.remove('hidden');
-            document.getElementById('focusHeaderLabel').innerText = `${viewDate.toLocaleString('en-US', { month: 'long' })} - ${cat}`;
-            const filtered = expenses.filter(e => {
-                const d = new Date(e.date); return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && e.category === cat;
-            }).sort((a,b) => b.date - a.date || b.id - a.id);
-            const total = filtered.reduce((s,e) => s + e.amount, 0);
-            document.getElementById('focusTotalDisplay').innerText = `${total.toLocaleString('hu-HU')} Ft`;
-            
-            const count = filtered.length;
-            const avgTicket = count > 0 ? Math.round(total / count) : 0;
-            document.getElementById('statTicket').innerText = avgTicket.toLocaleString('hu-HU') + ' Ft';
-            
-            let pulse = "--";
-            if (count > 1) {
-                const newest = filtered[0].date;
-                const oldest = filtered[filtered.length - 1].date;
-                const diffDays = (newest - oldest) / (1000 * 60 * 60 * 24);
-                
-                if (diffDays === 0) {
-                    pulse = "Same Day";
-                } else {
-                    const freq = diffDays / (count - 1);
-                    pulse = freq < 1 ? "Daily" : `${freq.toFixed(1)} Days`;
-                }
-            }
-            document.getElementById('statPulse').innerText = pulse;
-            
-            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            const dayCounts = [0,0,0,0,0,0,0];
-            filtered.forEach(e => dayCounts[new Date(e.date).getDay()]++);
-            const maxDayIndex = dayCounts.indexOf(Math.max(...dayCounts));
-            document.getElementById('statDoom').innerText = count > 0 ? days[maxDayIndex] : "--";
-
-            document.getElementById('focusList').innerHTML = filtered.map(e => {
-                const col = getCatColor(e.category); const textColor = getContrastColor(col);
-                const noteHtml = e.note ? `<span class="block text-[8px] italic font-medium opacity-80" style="color:${textColor}">${e.note}</span>` : '';
-                return `<li onclick='editById(${e.id})' class="stack-item" style="background-color: ${col}; color: ${textColor}; border-color: ${col}"><div class="flex flex-col leading-tight"><span class="text-xs font-black uppercase tracking-tight">${e.category}</span>${noteHtml}<span class="text-[8px] font-bold uppercase opacity-70">${new Date(e.date).toLocaleDateString('hu-HU')}</span></div><div class="flex items-center gap-2"><span class="font-black text-sm tabular-nums">${Math.round(e.amount).toLocaleString('hu-HU')}</span><button onclick="event.stopPropagation(); deleteFromDb(${e.id})" class="text-lg px-2 opacity-40 hover:opacity-100">×</button></div></li>`;
-            }).join('');
-        }
-        function openInputMode(isNew = true) {
-            document.getElementById('inputOverlay').classList.remove('hidden');
-            const scroller = document.getElementById('dateScrollerWrapper'); scroller.classList.remove('hidden');
-            if(isNew) {
-                currentEditItem = null; document.getElementById('amountInput').value = ''; document.getElementById('noteInput').value = '';
-                document.getElementById('inputHeaderLabel').innerText = "Add New"; syncSelectedDateToView();
-                document.getElementById('dateLocationBottom').appendChild(scroller);
-            } else {
-                document.getElementById('inputHeaderLabel').innerText = "Edit Entry"; document.getElementById('dateLocationTop').appendChild(scroller);
-            }
-            document.getElementById('amountInput').focus(); renderCategories(); renderDateScroller();
-        }
-        function closeInputMode() { document.getElementById('inputOverlay').classList.add('hidden'); document.getElementById('amountInput').blur(); document.getElementById('noteInput').blur(); currentEditItem = null; }
-        function saveTransaction(cat) {
-            const raw = document.getElementById('amountInput').value.replace(/\s+/g, ''); const note = document.getElementById('noteInput').value.trim();
-            if(!raw) return; saveToDb(cat, parseFloat(raw), selectedTimestamp, note, currentEditItem ? currentEditItem.id : null); closeInputMode();
-        }
-        function editItem(item) {
-            currentEditItem = item; selectedTimestamp = item.date;
-            document.getElementById('amountInput').value = Number(item.amount).toLocaleString('hu-HU').replace(/,/g, ' ');
-            document.getElementById('noteInput').value = item.note || ''; openInputMode(false); 
-        }
-        function startLongPress(catName) { longPressTimer = setTimeout(() => { selectedCatForMenu = catName; openCatModal(); }, 800); }
-        function cancelLongPress() { clearTimeout(longPressTimer); }
-        function openCatModal() { triggerHaptic(); document.getElementById('catModalTitle').innerText = selectedCatForMenu; document.getElementById('catModal').classList.remove('hidden'); }
-        function closeCatModal() { document.getElementById('catModal').classList.add('hidden'); selectedCatForMenu = null; }
-        function handleRename() { const newName = prompt("New Name:", selectedCatForMenu); if(newName && newName !== selectedCatForMenu) { renameCategoryDb(selectedCatForMenu, newName); closeCatModal(); } }
-        function handleDeleteCat() { if(confirm(`Delete "${selectedCatForMenu}"?`)) { deleteCategoryFromDb(selectedCatForMenu); closeCatModal(); } }
-        function closeFocusView() { document.getElementById('focusView').classList.add('hidden'); document.getElementById('summaryView').classList.remove('hidden'); }
-        function editById(id) { const item = expenses.find(e => e.id === id); if(item) editItem(item); }
-        function getComparisonData() {
-            let compareDayLimit = 31; const now = new Date();
-            if (viewDate.getMonth() === now.getMonth() && viewDate.getFullYear() === now.getFullYear()) compareDayLimit = now.getDate();
-            let prevMonthIdx = viewDate.getMonth() - 1; let prevYear = viewDate.getFullYear();
-            if (prevMonthIdx < 0) { prevMonthIdx = 11; prevYear -= 1; }
-            const prevExpenses = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === prevMonthIdx && d.getFullYear() === prevYear && d.getDate() <= compareDayLimit; });
-            return { prevTotal: prevExpenses.reduce((sum, e) => sum + e.amount, 0), prevExpenses };
-        }
-        function toggleView() {
-            isSummaryMode = !isSummaryMode;
-            document.getElementById('controlGrid').classList.toggle('hidden', isSummaryMode);
-            document.getElementById('activityView').classList.toggle('hidden', isSummaryMode);
-            document.getElementById('summaryView').classList.toggle('hidden', !isSummaryMode);
-            document.getElementById('focusView').classList.add('hidden');
-            if(isSummaryMode) renderAll();
-        }
-        function syncSelectedDateToView() { const now = new Date(); if(now.getMonth() === viewDate.getMonth()) selectedTimestamp = new Date().setHours(12,0,0,0); else selectedTimestamp = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).setHours(12,0,0,0); }
-        function renderDateScroller() {
-            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth()+1, 0).getDate(); let html = '';
-            for(let i=1; i<=daysInMonth; i++) {
-                const ts = new Date(viewDate.getFullYear(), viewDate.getMonth(), i).setHours(12,0,0,0); const isSel = ts === selectedTimestamp;
-                html += `<div onclick="selectedTimestamp=${ts}; renderDateScroller()" class="date-card ${isSel?'selected':''}"><span class="text-[9px] font-bold uppercase">DAY</span><span class="text-lg font-black">${i}</span></div>`;
-            }
-            document.getElementById('dateScroller').innerHTML = html;
-            setTimeout(() => { const sel = document.querySelector('.date-card.selected'); if(sel) sel.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }, 10);
-        }
-        document.getElementById('amountInput').addEventListener('input', (e) => { e.target.value = Number(e.target.value.replace(/[^0-9]/g, '')).toLocaleString('hu-HU').replace(/,/g,' '); });
-        window.changeMonth = (d) => { viewDate.setMonth(viewDate.getMonth()+d); init(); };
-        window.jumpToToday = () => { viewDate = new Date(); init(); };
-        window.setBudget = () => { const n = prompt("Monthly Limit:", budgetLimit); if(n!==null) { budgetLimit = parseFloat(n); localStorage.setItem('budgetLimit', budgetLimit); renderAll(); }};
-        window.addNewCategory = () => { const n = prompt("New Category:"); if(n) { addCategoryToDb(n); }};
-        window.deleteItem = (i) => { if(confirm("Delete?")) { expenses.splice(i,1); renderAll(); }};
-        window.clearAll = () => { if(confirm("Reset App?")) { localStorage.clear(); location.reload(); }};
-        window.exportToCSV = () => { /* CSV Logic */ };
-
-        init();
-    </script>
+    const savedConfig = getSavedConfig();
+    if (savedConfig) {
+      $("firebaseConfigInput").value = JSON.stringify(savedConfig, null, 2);
+      bootFirebase(savedConfig).catch((error) => {
+        console.error(error);
+        showScreen("setupScreen");
+      });
+    } else {
+      showScreen("setupScreen");
+    }
+  </script>
 </body>
 </html>

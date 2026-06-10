@@ -1,10 +1,23 @@
-const cacheName = 'spend-v1';
-const assets = ['./', './index.html', './manifest.json'];
+const cacheName = "spend-csv-v1";
+const assets = ["./", "./index.html", "./manifest.json"];
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(cacheName).then(cache => cache.addAll(assets)));
+self.addEventListener("install", (event) => {
+  event.waitUntil(caches.open(cacheName).then((cache) => cache.addAll(assets)));
+  self.skipWaiting();
 });
 
-self.addEventListener('fetch', e => {
-  e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((key) => key !== cacheName).map((key) => caches.delete(key)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+  event.respondWith(
+    caches.match(event.request).then((cached) => cached || fetch(event.request))
+  );
 });

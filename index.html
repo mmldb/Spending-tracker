@@ -468,6 +468,7 @@
           <button id="exportCsvBtn" class="btn primary block">Export CSV</button>
           <button id="exportJsonBtn" class="btn block">Export JSON backup</button>
           <button id="manualTxBtn" class="btn block">Add transaction</button>
+          <button id="cleanTransactionsBtn" class="btn block">Clean duplicate transactions</button>
           <button id="settingsConfigBtn" class="btn block">Firebase config</button>
           <button id="logoutBtn" class="btn danger block">Sign out</button>
         </div>
@@ -485,6 +486,8 @@
     <button class="tab" data-view="rulesView">Rules</button>
     <button class="tab" data-view="settingsView">More</button>
   </nav>
+
+  <div id="toast" class="hidden" style="position:fixed; left:50%; bottom:88px; transform:translateX(-50%); z-index:90; width:min(calc(100% - 32px), 420px); background:#fff; color:#000; border-radius:8px; padding:12px 14px; font-size:12px; font-weight:950; text-align:center; text-transform:uppercase; letter-spacing:.06em;"></div>
 
   <div id="txModal" class="modal">
     <div class="sheet">
@@ -564,6 +567,7 @@
     let currentImportFile = "";
     let autoCreateRules = true;
     let editingTxId = null;
+    let savingReviewIds = new Set();
 
     const $ = (id) => document.getElementById(id);
     const money = (value, currency = "HUF") => {
@@ -572,6 +576,12 @@
       return `${amount.toLocaleString("hu-HU")} ${currency}`;
     };
     const todayISO = () => new Date().toISOString().slice(0, 10);
+    const showToast = (message) => {
+      $("toast").textContent = message;
+      $("toast").classList.remove("hidden");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => $("toast").classList.add("hidden"), 1800);
+    };
     const normalize = (value) => String(value || "")
       .toLowerCase()
       .normalize("NFD")
@@ -960,7 +970,7 @@
     }
 
     function makeFingerprint(row) {
-      return normalize(`${row.date} ${row.amount} ${row.currency} ${row.merchant || row.description}`);
+      return normalize(`${row.date} ${row.amount} ${row.currency} ${row.merchant || ""} ${row.description || ""}`);
     }
 
     function matchRule(merchant, description) {
@@ -1099,11 +1109,13 @@
 
     function renderReview() {
       $("autoRuleToggle").classList.toggle("active", autoCreateRules);
-      const rows = importPreview.filter((row) => row.status === "review");
+      const rows = importPreview.filter((row) => row.status === "review" || row.status === "saving");
       const reviewCategories = uniqueCategories();
       const categoryButtons = (row) => reviewCategories.length ? `
         <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;" class="mt">
-          ${reviewCategories.map((cat) => `<button class="btn" style="border-color:${cat.color}; justify-content:flex-start; min-height:44px;" data-review-id="${row.id}" data-cat-id="${cat.id}"><span class="category-dot" style="background:${cat.color}"></span>${escapeHTML(cat.name)}</button>`).join("")}
+          ${row.status === "saving"
+            ? `<button class="btn primary block" disabled style="grid-column:1 / -1;">Saving...</button>`
+            : reviewCategories.map((cat) => `<button class="btn" style="border-color:${cat.color}; justify-content:flex-start; min-height:44px;" data-review-id="${row.id}" data-cat-id="${cat.id}"><span class="category-dot" style="background:${cat.color}"></span>${escapeHTML(cat.name)}</button>`).join("")}
         </div>
       ` : `<div class="empty mt">No categories yet. Go to Rules -> + Category first.</div>`;
       $("reviewList").innerHTML = rows.length ? rows.map((row) => `
@@ -1126,12 +1138,24 @@
         btn.addEventListener("click", async () => {
           const row = importPreview.find((item) => item.id === btn.dataset.reviewId);
           if (!row) return;
+          if (savingReviewIds.has(row.id)) return;
+          savingReviewIds.add(row.id);
           row.categoryId = btn.dataset.catId;
-          if (autoCreateRules) await createRuleFromRow(row);
-          await saveReviewedRow(row);
-          importPreview = importPreview.filter((item) => item.id !== row.id);
-          renderAll();
-          showView(importPreview.some((item) => item.status === "review") ? "reviewView" : "importView");
+          row.status = "saving";
+          renderReview();
+          try {
+            if (autoCreateRules) await createRuleFromRow(row);
+            const saved = await saveReviewedRow(row);
+            importPreview = importPreview.filter((item) => item.id !== row.id);
+            showToast(saved ? "Saved" : "Already imported");
+          } catch (error) {
+            row.status = "review";
+            alert(`Save failed: ${error.message}`);
+          } finally {
+            savingReviewIds.delete(row.id);
+            renderAll();
+            showView(importPreview.some((item) => item.status === "review") ? "reviewView" : "importView");
+          }
         });
       });
       return;
@@ -1223,7 +1247,35 @@
       renderAll();
     }
 
+    async function cleanDuplicateTransactions() {
+      const groups = new Map();
+      transactions.forEach((tx) => {
+        const key = makeFingerprint(tx);
+        if (!key) return;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(tx);
+      });
+      const duplicates = [...groups.values()].filter((items) => items.length > 1);
+      const deleteCount = duplicates.reduce((sum, items) => sum + items.length - 1, 0);
+      if (!deleteCount) {
+        showToast("No duplicates found");
+        return;
+      }
+      if (!confirm(`Delete ${deleteCount} duplicate transaction(s)?`)) return;
+      const batch = writeBatch(db);
+      duplicates.forEach((items) => {
+        const sorted = [...items].sort((a, b) => String(a.createdAt?.seconds || 0).localeCompare(String(b.createdAt?.seconds || 0)));
+        sorted.slice(1).forEach((tx) => batch.delete(doc(userCollection("transactions"), tx.id)));
+      });
+      await batch.commit();
+      showToast(`Deleted ${deleteCount} duplicates`);
+    }
+
     async function saveReviewedRow(row) {
+      const fingerprint = makeFingerprint(row);
+      if (transactions.some((tx) => (tx.fingerprint || makeFingerprint(tx)) === fingerprint)) {
+        return false;
+      }
       await addDoc(userCollection("transactions"), {
         date: row.date,
         amount: row.amount,
@@ -1234,16 +1286,23 @@
         categoryId: row.categoryId,
         source: row.source,
         importFile: row.importFile,
-        fingerprint: row.fingerprint,
+        fingerprint,
         createdAt: serverTimestamp()
       });
+      return true;
     }
 
     async function savePreviewRows(statuses = ["ready"]) {
       const rows = importPreview.filter((row) => statuses.includes(row.status));
       if (!rows.length) return;
       const batch = writeBatch(db);
+      const seen = new Set(transactions.map((tx) => tx.fingerprint || makeFingerprint(tx)));
+      const savedRows = [];
       rows.forEach((row) => {
+        const fingerprint = makeFingerprint(row);
+        if (seen.has(fingerprint)) return;
+        seen.add(fingerprint);
+        savedRows.push(row);
         const ref = doc(userCollection("transactions"));
         batch.set(ref, {
           date: row.date,
@@ -1255,12 +1314,18 @@
           categoryId: row.categoryId,
           source: row.source,
           importFile: row.importFile,
-          fingerprint: row.fingerprint,
+          fingerprint,
           createdAt: serverTimestamp()
         });
       });
+      if (!savedRows.length) {
+        showToast("Already imported");
+        return;
+      }
       await batch.commit();
-      importPreview = importPreview.filter((row) => !statuses.includes(row.status));
+      const savedIds = new Set(savedRows.map((row) => row.id));
+      importPreview = importPreview.filter((row) => !savedIds.has(row.id));
+      showToast(`Imported ${savedRows.length}`);
       renderAll();
     }
 
@@ -1429,6 +1494,7 @@
     $("exportCsvBtn").addEventListener("click", exportCSV);
     $("exportJsonBtn").addEventListener("click", exportJSON);
     $("manualTxBtn").addEventListener("click", () => openTxModal());
+    $("cleanTransactionsBtn").addEventListener("click", cleanDuplicateTransactions);
     $("saveTxBtn").addEventListener("click", saveManualTx);
     $("deleteTxBtn").addEventListener("click", async () => {
       if (!editingTxId || !confirm("Delete transaction?")) return;

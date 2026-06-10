@@ -827,7 +827,7 @@
     }
 
     function fillCategorySelect() {
-      const options = categories.map((cat) => `<option value="${cat.id}">${escapeHTML(cat.name)}</option>`).join("");
+      const options = uniqueCategories().map((cat) => `<option value="${cat.id}">${escapeHTML(cat.name)}</option>`).join("");
       $("txCategoryInput").innerHTML = options;
     }
 

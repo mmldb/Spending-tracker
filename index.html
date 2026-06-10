@@ -837,9 +837,10 @@
       const normalized = headers.map(normalize);
       for (const alias of aliases) {
         const key = normalize(alias);
+        if (!key || key.length < 3) continue;
         const exact = normalized.indexOf(key);
         if (exact >= 0) return exact;
-        const partial = normalized.findIndex((header) => header.includes(key) || key.includes(header));
+        const partial = normalized.findIndex((header) => header.length >= 3 && (header.includes(key) || key.includes(header)));
         if (partial >= 0) return partial;
       }
       return -1;
@@ -871,7 +872,10 @@
       const type = normalize(cells[0]);
       if (type.includes("bankkartya") || type.includes("kartya") || type.includes("zarolas")) {
         return cells.slice(6, 11).map((cell) => String(cell || "").trim())
-          .find((cell) => cell && !/^\d/.test(cell) && !normalize(cell).includes("tran ideje") && !normalize(cell).includes("tran osszeg")) || guessMerchant(cells.join(" "));
+          .find((cell) => {
+            const key = normalize(cell);
+            return cell && !/^\d/.test(cell) && !key.includes(" az ") && !key.startsWith("az ") && !key.includes("tran ideje") && !key.includes("tran osszeg");
+          }) || guessMerchant(cells.join(" "));
       }
       const details = String(cells[5] || "").trim();
       const payee = details.replace(/^\d+/, "").trim();
@@ -880,6 +884,30 @@
 
     function otpDescription(cells) {
       return cells.slice(0, 11).filter(Boolean).join(" | ");
+    }
+
+    function parseOtpRows(rows, headerRowIndex, fileName) {
+      const existing = new Set(transactions.map((tx) => tx.fingerprint).filter(Boolean));
+      return rows.slice(headerRowIndex + 1)
+        .filter(looksLikeOtpDataRow)
+        .map((cells) => {
+          const parsed = {
+            id: makeId(),
+            date: parseDate(cells[1] || cells[2]),
+            amount: Math.abs(parseAmount(cells[4])),
+            currency: "HUF",
+            merchant: otpMerchant(cells),
+            description: otpDescription(cells),
+            direction: "expense",
+            source: "csv",
+            importFile: fileName
+          };
+          parsed.fingerprint = makeFingerprint(parsed);
+          const rule = matchRule(parsed.merchant, parsed.description);
+          parsed.categoryId = rule?.categoryId || null;
+          parsed.status = existing.has(parsed.fingerprint) ? "duplicate" : (parsed.categoryId ? "ready" : "review");
+          return parsed;
+        });
     }
 
     function makeFingerprint(row) {
@@ -916,6 +944,20 @@
       if (rows.length < 2) throw new Error("No CSV rows found.");
       const headerRowIndex = findHeaderRow(rows);
       const headers = rows[headerRowIndex];
+      const isOtpCsv = looksLikeOtpHeader(headers) || rows.slice(0, 8).some(looksLikeOtpDataRow);
+      if (isOtpCsv) {
+        currentImportFile = fileName;
+        importPreview = parseOtpRows(rows, headerRowIndex, fileName);
+        if (!importPreview.length) {
+          throw new Error(`OTP CSV was detected, but no transaction rows were found. Header: ${headers.join(" | ")}`);
+        }
+        $("importStatus").classList.remove("hidden");
+        $("importStatus").textContent = `Parsed ${importPreview.length} OTP rows. Header row: ${headerRowIndex + 1}.`;
+        renderImportPreview();
+        renderReview();
+        showView("importView");
+        return;
+      }
       const idx = {
         date: headerIndex(headers, DATE_HEADERS),
         amount: headerIndex(headers, AMOUNT_HEADERS),
@@ -925,13 +967,6 @@
         description: headerIndex(headers, DESCRIPTION_HEADERS),
         currency: headerIndex(headers, CURRENCY_HEADERS)
       };
-      if (looksLikeOtpHeader(headers) || (idx.date < 0 && rows.slice(headerRowIndex + 1, headerRowIndex + 6).some(looksLikeOtpDataRow))) {
-        idx.date = 1;
-        idx.amount = 4;
-        idx.merchant = -1;
-        idx.description = -1;
-        idx.currency = -1;
-      }
       if (idx.date < 0 || (idx.amount < 0 && idx.debit < 0 && idx.credit < 0)) {
         throw new Error(`Could not detect date and amount columns. Detected headers: ${headers.join(" | ")}`);
       }
@@ -944,10 +979,9 @@
         let signedAmount = parseAmount(cells[amountIndex]);
         if (!signedAmount && idx.credit >= 0) signedAmount = parseAmount(cells[idx.credit]);
         if (!signedAmount && idx.debit >= 0) signedAmount = -Math.abs(parseAmount(cells[idx.debit]));
-        const otpRow = looksLikeOtpDataRow(cells);
-        const direction = otpRow || debitColumn || signedAmount < 0 ? "expense" : "income";
-        const description = otpRow ? otpDescription(cells) : (cells[idx.description] || cells[idx.merchant] || "");
-        const merchant = otpRow ? otpMerchant(cells) : (cells[idx.merchant] || guessMerchant(description));
+        const direction = debitColumn || signedAmount < 0 ? "expense" : "income";
+        const description = cells[idx.description] || cells[idx.merchant] || "";
+        const merchant = cells[idx.merchant] || guessMerchant(description);
         const parsed = {
           id: makeId(),
           date: parseDate(cells[idx.date]),
@@ -1005,9 +1039,52 @@
       `;
     }
 
+    function shortDescription(text) {
+      return String(text || "")
+        .split("|")
+        .map((part) => part.trim())
+        .filter((part) => part && !normalize(part).includes("tran ideje") && !normalize(part).includes("tran osszeg"))
+        .slice(0, 3)
+        .join(" · ");
+    }
+
     function renderReview() {
       $("autoRuleToggle").classList.toggle("active", autoCreateRules);
       const rows = importPreview.filter((row) => row.status === "review");
+      const categoryButtons = (row) => categories.length ? `
+        <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;" class="mt">
+          ${categories.map((cat) => `<button class="btn" style="border-color:${cat.color}; justify-content:flex-start; min-height:44px;" data-review-id="${row.id}" data-cat-id="${cat.id}"><span class="category-dot" style="background:${cat.color}"></span>${escapeHTML(cat.name)}</button>`).join("")}
+        </div>
+      ` : `<div class="empty mt">No categories yet. Go to Rules -> + Category first.</div>`;
+      $("reviewList").innerHTML = rows.length ? rows.map((row) => `
+        <div class="panel">
+          <div class="row" style="padding:0; border:0; background:transparent;">
+            <span>
+              <span class="row-title">${escapeHTML(row.merchant)}</span>
+              <span class="row-meta">${escapeHTML(row.date)} · ${escapeHTML(shortDescription(row.description))}</span>
+            </span>
+            <span class="amount">${money(row.amount, row.currency)}</span>
+          </div>
+          ${categoryButtons(row)}
+          <details class="mt">
+            <summary class="row-meta">Details</summary>
+            <div class="row-meta">${escapeHTML(row.description || "")}</div>
+          </details>
+        </div>
+      `).join("") : `<div class="empty">Nothing to review. Nice.</div>`;
+      [...$("reviewList").querySelectorAll("[data-review-id]")].forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const row = importPreview.find((item) => item.id === btn.dataset.reviewId);
+          if (!row) return;
+          row.categoryId = btn.dataset.catId;
+          if (autoCreateRules) await createRuleFromRow(row);
+          await saveReviewedRow(row);
+          importPreview = importPreview.filter((item) => item.id !== row.id);
+          renderAll();
+          showView(importPreview.some((item) => item.status === "review") ? "reviewView" : "importView");
+        });
+      });
+      return;
       $("reviewList").innerHTML = rows.length ? rows.map((row) => `
         <div class="panel">
           <div class="row-title">${escapeHTML(row.merchant)}</div>
@@ -1037,6 +1114,22 @@
         pattern,
         merchantName: row.merchant,
         categoryId: row.categoryId,
+        createdAt: serverTimestamp()
+      });
+    }
+
+    async function saveReviewedRow(row) {
+      await addDoc(userCollection("transactions"), {
+        date: row.date,
+        amount: row.amount,
+        currency: row.currency,
+        direction: row.direction,
+        merchant: row.merchant,
+        description: row.description,
+        categoryId: row.categoryId,
+        source: row.source,
+        importFile: row.importFile,
+        fingerprint: row.fingerprint,
         createdAt: serverTimestamp()
       });
     }

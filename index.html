@@ -401,7 +401,10 @@
         </div>
         <div class="topbar mb">
           <span class="subtle">Recent</span>
-          <button id="quickImportBtn" class="btn primary">Import</button>
+          <span style="display:flex; gap:8px;">
+            <button id="quickAddBtn" class="btn">Add</button>
+            <button id="quickImportBtn" class="btn primary">Import</button>
+          </span>
         </div>
         <div id="recentList" class="stack"></div>
       </section>
@@ -424,6 +427,7 @@
           <button id="saveReadyBtn" class="btn primary block">Import ready rows</button>
           <button id="clearImportBtn" class="btn block">Clear preview</button>
         </div>
+        <div id="importStatus" class="notice mt hidden"></div>
         <div class="topbar mt mb">
           <span class="subtle">Preview</span>
           <span id="importFileLabel" class="pill">No file</span>
@@ -443,10 +447,16 @@
 
       <section id="rulesView" class="view hidden">
         <div class="topbar mb">
-          <span class="subtle">Merchant rules</span>
+          <span class="subtle">Categories & rules</span>
           <button id="addCategoryBtn" class="btn">+ Category</button>
         </div>
+        <div class="notice mb">
+          Categories are used for manual entries and CSV review. Merchant rules are learned when you review a CSV row.
+        </div>
         <div id="categoryList" class="chip-row mb"></div>
+        <div class="topbar mb">
+          <span class="subtle">Merchant rules</span>
+        </div>
         <div id="rulesList" class="stack"></div>
       </section>
 
@@ -760,7 +770,15 @@
       $("txCategoryInput").innerHTML = options;
     }
 
-    function parseCSV(text) {
+    function detectDelimiter(text) {
+      const sample = text.split(/\r?\n/).find((line) => line.trim()) || "";
+      const candidates = [";", "\t", ","];
+      return candidates
+        .map((delimiter) => ({ delimiter, count: sample.split(delimiter).length }))
+        .sort((a, b) => b.count - a.count)[0].delimiter;
+    }
+
+    function parseCSV(text, delimiter = detectDelimiter(text)) {
       const rows = [];
       let row = [];
       let cell = "";
@@ -773,7 +791,7 @@
           i++;
         } else if (ch === '"') {
           quote = !quote;
-        } else if ((ch === "," || ch === ";" || ch === "\t") && !quote) {
+        } else if (ch === delimiter && !quote) {
           row.push(cell.trim());
           cell = "";
         } else if ((ch === "\n" || ch === "\r") && !quote) {
@@ -789,6 +807,17 @@
       row.push(cell.trim());
       if (row.some(Boolean)) rows.push(row);
       return rows;
+    }
+
+    function findHeaderRow(rows) {
+      const limit = Math.min(rows.length, 25);
+      for (let i = 0; i < limit; i++) {
+        const headers = rows[i];
+        const hasDate = headerIndex(headers, DATE_HEADERS) >= 0;
+        const hasAmount = headerIndex(headers, AMOUNT_HEADERS) >= 0 || headerIndex(headers, DEBIT_HEADERS) >= 0 || headerIndex(headers, CREDIT_HEADERS) >= 0;
+        if (hasDate && hasAmount) return i;
+      }
+      return 0;
     }
 
     function headerIndex(headers, aliases) {
@@ -843,24 +872,43 @@
       return (parts[0] || normalized || "Unknown").slice(0, 56);
     }
 
+    const DATE_HEADERS = ["date", "datum", "dátum", "booking date", "completed date", "transaction date", "könyvelés dátuma", "konyveles datuma", "értéknap", "erteknap", "tranzakció dátuma", "tranzakcio datuma"];
+    const AMOUNT_HEADERS = ["amount", "osszeg", "összeg", "value", "sum", "paid out", "debit", "terhelés", "terheles", "tranzakció összege", "tranzakcio osszege", "összeg (huf)", "osszeg (huf)", "amount (huf)", "net amount"];
+    const DEBIT_HEADERS = ["paid out", "debit", "terhelés", "terheles", "kifizetés", "kifizetes", "kiadás", "kiadas", "withdrawal"];
+    const CREDIT_HEADERS = ["paid in", "credit", "jóváírás", "jovairas", "bevétel", "bevetel", "deposit"];
+    const MERCHANT_HEADERS = ["merchant", "partner", "name", "counterparty", "kedvezményezett", "kedvezmenyezett", "kereskedő", "kereskedo", "partner név", "partner nev", "ellenoldali név", "ellenoldali nev"];
+    const DESCRIPTION_HEADERS = ["description", "details", "leiras", "leírás", "note", "message", "közlemény", "kozlemeny", "tranzakció típusa", "tranzakcio tipusa", "megnevezés", "megnevezes"];
+    const CURRENCY_HEADERS = ["currency", "deviza", "ccy", "pénznem", "penznem"];
+
     function buildPreviewFromCSV(text, fileName) {
-      const rows = parseCSV(text);
+      $("importStatus").classList.add("hidden");
+      $("importStatus").textContent = "";
+      const delimiter = detectDelimiter(text);
+      const rows = parseCSV(text, delimiter);
       if (rows.length < 2) throw new Error("No CSV rows found.");
-      const headers = rows[0];
+      const headerRowIndex = findHeaderRow(rows);
+      const headers = rows[headerRowIndex];
       const idx = {
-        date: headerIndex(headers, ["date", "datum", "dátum", "booking date", "completed date", "transaction date", "könyvelés dátuma"]),
-        amount: headerIndex(headers, ["amount", "osszeg", "összeg", "value", "sum", "paid out", "debit", "terhelés", "terheles"]),
-        merchant: headerIndex(headers, ["merchant", "partner", "name", "counterparty", "kedvezményezett", "kereskedő"]),
-        description: headerIndex(headers, ["description", "details", "leiras", "leírás", "note", "message", "közlemény"]),
-        currency: headerIndex(headers, ["currency", "deviza", "ccy"])
+        date: headerIndex(headers, DATE_HEADERS),
+        amount: headerIndex(headers, AMOUNT_HEADERS),
+        debit: headerIndex(headers, DEBIT_HEADERS),
+        credit: headerIndex(headers, CREDIT_HEADERS),
+        merchant: headerIndex(headers, MERCHANT_HEADERS),
+        description: headerIndex(headers, DESCRIPTION_HEADERS),
+        currency: headerIndex(headers, CURRENCY_HEADERS)
       };
-      if (idx.date < 0 || idx.amount < 0) throw new Error("Could not detect date and amount columns.");
-      const amountHeader = normalize(headers[idx.amount]);
+      if (idx.date < 0 || (idx.amount < 0 && idx.debit < 0 && idx.credit < 0)) {
+        throw new Error(`Could not detect date and amount columns. Detected headers: ${headers.join(" | ")}`);
+      }
+      const amountIndex = idx.amount >= 0 ? idx.amount : (idx.debit >= 0 ? idx.debit : idx.credit);
+      const amountHeader = normalize(headers[amountIndex]);
       const debitColumn = ["paid out", "debit", "terheles", "kifizetes", "kiadas"].some((token) => amountHeader.includes(normalize(token)));
       const existing = new Set(transactions.map((tx) => tx.fingerprint).filter(Boolean));
       currentImportFile = fileName;
-      importPreview = rows.slice(1).map((cells) => {
-        const signedAmount = parseAmount(cells[idx.amount]);
+      importPreview = rows.slice(headerRowIndex + 1).map((cells) => {
+        let signedAmount = parseAmount(cells[amountIndex]);
+        if (!signedAmount && idx.credit >= 0) signedAmount = parseAmount(cells[idx.credit]);
+        if (!signedAmount && idx.debit >= 0) signedAmount = -Math.abs(parseAmount(cells[idx.debit]));
         const direction = debitColumn || signedAmount < 0 ? "expense" : "income";
         const description = cells[idx.description] || cells[idx.merchant] || "";
         const merchant = cells[idx.merchant] || guessMerchant(description);
@@ -881,6 +929,11 @@
         parsed.status = existing.has(parsed.fingerprint) ? "duplicate" : (parsed.categoryId ? "ready" : "review");
         return parsed;
       }).filter((row) => row.amount > 0);
+      if (!importPreview.length) {
+        throw new Error(`CSV was read, but no transaction rows were found. Header: ${headers.join(" | ")}`);
+      }
+      $("importStatus").classList.remove("hidden");
+      $("importStatus").textContent = `Parsed ${importPreview.length} rows using "${delimiter === "\t" ? "tab" : delimiter}" delimiter. Header row: ${headerRowIndex + 1}.`;
       renderImportPreview();
       renderReview();
       showView("importView");
@@ -1113,6 +1166,7 @@
 
     $("logoutBtn").addEventListener("click", () => signOut(auth));
     $("userBtn").addEventListener("click", () => showView("settingsView"));
+    $("quickAddBtn").addEventListener("click", () => openTxModal());
     $("quickImportBtn").addEventListener("click", () => showView("importView"));
     $("autoRuleToggle").addEventListener("click", () => {
       autoCreateRules = !autoCreateRules;
@@ -1142,10 +1196,19 @@
     $("csvFileInput").addEventListener("change", async (event) => {
       const file = event.target.files?.[0];
       if (!file) return;
+      currentImportFile = file.name;
+      $("importFileLabel").textContent = file.name;
+      $("importStatus").classList.remove("hidden");
+      $("importStatus").textContent = "Reading CSV...";
       try {
         buildPreviewFromCSV(await file.text(), file.name);
       } catch (error) {
-        alert(`CSV import error: ${error.message}`);
+        importPreview = [];
+        $("importSummary").classList.add("hidden");
+        $("importActions").classList.add("hidden");
+        $("previewList").innerHTML = `<div class="empty">No rows imported yet.</div>`;
+        $("importStatus").classList.remove("hidden");
+        $("importStatus").textContent = `CSV import error: ${error.message}`;
       } finally {
         event.target.value = "";
       }
